@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 :root{
@@ -474,6 +475,7 @@ function App(){
     const existOt=new Set(data.overtime.filter(o=>o.syncKey).map(o=>o.syncKey));
     const existEarly=new Set((data.early||[]).filter(l=>l.syncKey).map(l=>l.syncKey));
     const newLate=[],newOt=[],newEarly=[],items=[]; let addedLate=0,addedOt=0,addedEarly=0,dup=0;
+    const earlyInfo={}; // syncKey → {checkIn,checkOut} (기존 레코드 백필용)
     (days||[]).forEach(d=>{
       if(d.isHoliday) return;
       if(d.lateMinutes>0){
@@ -483,6 +485,7 @@ function App(){
       }
       if(d.earlyMinutes>0){
         const k="gw:early:"+authId+":"+d.date;
+        earlyInfo[k]={checkIn:d.checkIn,checkOut:d.checkOut};
         if(existEarly.has(k)){ dup++; }
         else{ const isLink=!!d.linkDay; newEarly.push({id:uid(),memberId:authId,date:d.date,earlyMinutes:d.earlyMinutes,checkIn:d.checkIn,checkOut:d.checkOut,reason:isLink?"링크데이 참석":("그룹웨어 조퇴 싱크"+(d.event?(" · "+d.event):"")),resolvedUsageId:null,linkDay:isLink,syncKey:k}); existEarly.add(k); addedEarly++; items.push({date:d.date,type:isLink?"조퇴(링크데이)":"조퇴",min:d.earlyMinutes,event:isLink?"링크데이 참석":d.event}); }
       }
@@ -492,7 +495,14 @@ function App(){
         else{ newOt.push({id:uid(),requesterId:authId,projectId:myProj?myProj.id:"",date:d.date,reason:"그룹웨어 자동 싱크"+(d.event?(" · "+d.event):""),plId:myProj?myProj.plId||"":"",lgId:myProj?myProj.lgId||"":"",start:d.schedEnd,end:d.checkOut||"",totalMin:d.overtimeMinutes,status:"completed",syncKey:k}); existOt.add(k); addedOt++; items.push({date:d.date,type:"초과근무",min:d.overtimeMinutes,event:d.event}); }
       }
     });
-    if(newLate.length||newOt.length||newEarly.length) persist({...data,late:[...newLate,...data.late],overtime:[...newOt,...data.overtime],early:[...newEarly,...(data.early||[])]});
+    // 기존 조퇴 레코드에 출근/퇴근 시간이 비어 있으면 이번 싱크 값으로 백필
+    let patched=0;
+    const patchedEarly=(data.early||[]).map(l=>{
+      const info=l.syncKey&&earlyInfo[l.syncKey];
+      if(info&&(!l.checkIn||!l.checkOut)){ patched++; return {...l,checkIn:l.checkIn||info.checkIn,checkOut:l.checkOut||info.checkOut}; }
+      return l;
+    });
+    if(newLate.length||newOt.length||newEarly.length||patched) persist({...data,late:[...newLate,...data.late],overtime:[...newOt,...data.overtime],early:[...newEarly,...patchedEarly]});
     items.sort((a,b)=>a.date<b.date?-1:1);
     return {addedLate,addedOt,addedEarly,dup,items,hasProject:!!myProj};
   };
@@ -590,36 +600,56 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
   const move=(delta)=>{ let m=view.m+delta,y=view.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} setView({y,m}); };
   const goToday=()=>setView({y:now.getFullYear(),m:now.getMonth()});
 
-  // 추가근무 추출: 현재 표시 중인 월 기준, 사용자별 추가근무 블록 + (조퇴에 사용했으면 조퇴 내역)을 엑셀로 출력
+  // 추가근무 추출: 현재 표시 중인 월 기준, 사용자별 추가근무 블록 + (조퇴에 사용했으면 조퇴 내역)을 진짜 .xlsx로 출력
   const exportOvertime=()=>{
+    if(typeof XLSX==="undefined"){ flash("엑셀 모듈을 불러오지 못했어요. 인터넷 연결을 확인해 주세요."); return; }
     const ym=view.y+"-"+String(view.m+1).padStart(2,"0");
     const fmtHM=(min)=>{ if(min==null)return""; const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); };
     const fmtMD=(ds)=>{ const p=String(ds||"").split("-"); return p.length===3?(p[1]+"월 "+p[2]+"일"):""; };
-    const esc=(s)=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     const mems=visibleIds.map(id=>member(id)).filter(m=>m&&m.role!=="master").sort((a,b)=>a.name.localeCompare(b.name,"ko"));
-    const TD='style="border:1px solid #888;padding:4px 8px;text-align:center;mso-number-format:\'@\';"';
-    const TH='style="border:1px solid #888;padding:4px 8px;text-align:center;font-weight:bold;background:#eef;"';
-    const rows=[];
+    // 데이터 행(2차원 배열): [사용자, 추가근무 날짜, 가용시간, 조퇴 날짜, 출근시간, 퇴근시간]
+    const body=[];
     mems.forEach(mem=>{
       const blocks=data.overtime.filter(o=>o.requesterId===mem.id&&o.status==="completed"&&String(o.date).slice(0,7)===ym).sort((a,b)=>a.date<b.date?-1:1);
-      const line=(name,d1,t1,d2,tin,tout)=>rows.push(`<tr><td ${TD}>${esc(name)}</td><td ${TD}>${esc(d1)}</td><td ${TD}>${esc(t1)}</td><td ${TD}>${esc(d2)}</td><td ${TD}>${esc(tin)}</td><td ${TD}>${esc(tout)}</td></tr>`);
-      if(blocks.length===0){ line(mem.name,"","","","",""); return; }
+      if(blocks.length===0){ body.push([mem.name,"","","","",""]); return; }
       blocks.forEach(b=>{
         const use=data.usage.find(u=>u.type==="조퇴"&&u.sourceId===b.id&&u.status!=="rejected");
         let eDate="",eIn="",eOut="";
         if(use){ const ev=(data.early||[]).find(e=>e.memberId===mem.id&&e.date===use.date); eDate=fmtMD(use.date); eIn=(ev&&ev.checkIn)||""; eOut=(ev&&ev.checkOut)||""; }
-        line(mem.name,fmtMD(b.date),fmtHM(b.totalMin),eDate,eIn,eOut);
+        body.push([mem.name,fmtMD(b.date),fmtHM(b.totalMin),eDate,eIn,eOut]);
       });
     });
-    const table=`<table border="1" style="border-collapse:collapse;">`
-      +`<tr><td colspan="6" ${TH}>${view.m+1}월</td></tr>`
-      +`<tr><td rowspan="2" ${TH}>사용자</td><td colspan="2" ${TH}>추가근무</td><td colspan="3" ${TH}>조퇴</td></tr>`
-      +`<tr><td ${TH}>날짜</td><td ${TH}>사용시간</td><td ${TH}>날짜</td><td ${TH}>출근시간</td><td ${TH}>퇴근시간</td></tr>`
-      +rows.join("")+`</table>`;
-    const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
-    const blob=new Blob([String.fromCharCode(0xFEFF)+html],{type:"application/vnd.ms-excel;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a"); a.href=url; a.download=`${view.y}년 ${view.m+1}월 추가근무.xls`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    const aoa=[
+      [`${view.m+1}월`,"","","","",""],
+      ["사용자","추가근무","","조퇴","",""],
+      ["","날짜","가용시간","날짜","출근시간","퇴근시간"],
+      ...body,
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"]=[
+      {s:{r:0,c:0},e:{r:0,c:5}},   // 6월 (전체 가로 병합)
+      {s:{r:1,c:0},e:{r:2,c:0}},   // 사용자 (세로 병합)
+      {s:{r:1,c:1},e:{r:1,c:2}},   // 추가근무 (2칸)
+      {s:{r:1,c:3},e:{r:1,c:5}},   // 조퇴 (3칸)
+    ];
+    ws["!cols"]=[{wch:10},{wch:11},{wch:9},{wch:11},{wch:9},{wch:9}];
+    const border={top:{style:"thin"},bottom:{style:"thin"},left:{style:"thin"},right:{style:"thin"}};
+    const center={horizontal:"center",vertical:"center"};
+    const titleStyle={font:{bold:true,sz:13},alignment:center,border};
+    const hdrStyle={font:{bold:true},alignment:center,border,fill:{patternType:"solid",fgColor:{rgb:"EEEEFF"}}};
+    const cellStyle={alignment:center,border};
+    const lastRow=aoa.length-1;
+    for(let R=0;R<=lastRow;R++){
+      for(let C=0;C<=5;C++){
+        const addr=XLSX.utils.encode_cell({r:R,c:C});
+        if(!ws[addr]) ws[addr]={t:"s",v:""};
+        ws[addr].s = R===0?titleStyle : (R<=2?hdrStyle:cellStyle);
+      }
+    }
+    ws["!ref"]=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:lastRow,c:5}});
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,`${view.m+1}월`);
+    XLSX.writeFile(wb,`${view.y}년 ${view.m+1}월 추가근무.xlsx`);
     flash(`${view.m+1}월 추가근무 추출 완료 (${mems.length}명)`);
   };
 
