@@ -290,6 +290,27 @@ function buildReportMail({kind,project,date,to,cc,reporter,rows}){
   return {title:subject, to, cc, html, text:tl.join("\n")};
 }
 
+// 근무조정(퇴근/출근) 보고 메일(HTML+텍스트) 생성 — 이미지 양식
+function buildAdjustMail({reporter,dept,title,teamTag,kind,reason,y,mo,d,hh,mm,etc,to,cc}){
+  const pad=(n)=>String(n).padStart(2,"0");
+  const yy=String(y).slice(2);
+  const subject="["+teamTag+"] "+reporter.name+" "+kind+" 근무조정 보고 ("+yy+"."+pad(mo)+"."+pad(d)+")";
+  const reporterLine="㈜링크제니시스 "+(dept?dept+" ":"")+reporter.name+(title?(" "+title):"")+" 입니다.";
+  const dtLine=y+"년 "+pad(mo)+"월 "+pad(d)+"일 "+pad(hh)+"시 "+pad(mm)+"분";
+  const items=[["조정 인원",reporter.name],["조정 사유",reason||""],["조정 일시",dtLine],["기타",etc||""]];
+  const liHtml=items.map(([k,v])=>"-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+escHtml(k)+" : "+escHtml(v)).join("<br>");
+  const html="<div style=\"font-family:'Malgun Gothic',sans-serif;font-size:13px;color:#1c2536;line-height:1.7;\">"
+    +"<p>안녕하세요<br>"+escHtml(reporterLine)+"</p>"
+    +"<p>아래와 같은 사유로 "+escHtml(kind)+" 근무 조정 신청합니다.</p>"
+    +"<p>"+liHtml+"</p>"
+    +"<p>이상입니다.<br>감사합니다.</p>"
+    +"</div>";
+  const tl=["안녕하세요",reporterLine,"","아래와 같은 사유로 "+kind+" 근무 조정 신청합니다.",""];
+  items.forEach(([k,v])=>tl.push("-\t"+k+" : "+v));
+  tl.push("","이상입니다.","감사합니다.");
+  return {title:subject, to, cc, html, text:tl.join("\n")};
+}
+
 // ── helpers ──
 const BASE=17*60+30, HALF=240, WD=["일","월","화","수","목","금","토"];
 const ROLE_LABEL={member:"팀원",partlead:"파트장",pl:"PL",lg:"스탭",master:"마스터"};
@@ -463,7 +484,7 @@ function App(){
       if(d.earlyMinutes>0){
         const k="gw:early:"+authId+":"+d.date;
         if(existEarly.has(k)){ dup++; }
-        else{ const isLink=!!d.linkDay; newEarly.push({id:uid(),memberId:authId,date:d.date,earlyMinutes:d.earlyMinutes,reason:isLink?"링크데이 참석":("그룹웨어 조퇴 싱크"+(d.event?(" · "+d.event):"")),resolvedUsageId:null,linkDay:isLink,syncKey:k}); existEarly.add(k); addedEarly++; items.push({date:d.date,type:isLink?"조퇴(링크데이)":"조퇴",min:d.earlyMinutes,event:isLink?"링크데이 참석":d.event}); }
+        else{ const isLink=!!d.linkDay; newEarly.push({id:uid(),memberId:authId,date:d.date,earlyMinutes:d.earlyMinutes,checkIn:d.checkIn,checkOut:d.checkOut,reason:isLink?"링크데이 참석":("그룹웨어 조퇴 싱크"+(d.event?(" · "+d.event):"")),resolvedUsageId:null,linkDay:isLink,syncKey:k}); existEarly.add(k); addedEarly++; items.push({date:d.date,type:isLink?"조퇴(링크데이)":"조퇴",min:d.earlyMinutes,event:isLink?"링크데이 참석":d.event}); }
       }
       if(d.overtimeMinutes>0){
         const k="gw:ot:"+authId+":"+d.date;
@@ -569,6 +590,39 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
   const move=(delta)=>{ let m=view.m+delta,y=view.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} setView({y,m}); };
   const goToday=()=>setView({y:now.getFullYear(),m:now.getMonth()});
 
+  // 추가근무 추출: 현재 표시 중인 월 기준, 사용자별 추가근무 블록 + (조퇴에 사용했으면 조퇴 내역)을 엑셀로 출력
+  const exportOvertime=()=>{
+    const ym=view.y+"-"+String(view.m+1).padStart(2,"0");
+    const fmtHM=(min)=>{ if(min==null)return""; const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); };
+    const fmtMD=(ds)=>{ const p=String(ds||"").split("-"); return p.length===3?(p[1]+"월 "+p[2]+"일"):""; };
+    const esc=(s)=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const mems=visibleIds.map(id=>member(id)).filter(m=>m&&m.role!=="master").sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+    const TD='style="border:1px solid #888;padding:4px 8px;text-align:center;mso-number-format:\'@\';"';
+    const TH='style="border:1px solid #888;padding:4px 8px;text-align:center;font-weight:bold;background:#eef;"';
+    const rows=[];
+    mems.forEach(mem=>{
+      const blocks=data.overtime.filter(o=>o.requesterId===mem.id&&o.status==="completed"&&String(o.date).slice(0,7)===ym).sort((a,b)=>a.date<b.date?-1:1);
+      const line=(name,d1,t1,d2,tin,tout)=>rows.push(`<tr><td ${TD}>${esc(name)}</td><td ${TD}>${esc(d1)}</td><td ${TD}>${esc(t1)}</td><td ${TD}>${esc(d2)}</td><td ${TD}>${esc(tin)}</td><td ${TD}>${esc(tout)}</td></tr>`);
+      if(blocks.length===0){ line(mem.name,"","","","",""); return; }
+      blocks.forEach(b=>{
+        const use=data.usage.find(u=>u.type==="조퇴"&&u.sourceId===b.id&&u.status!=="rejected");
+        let eDate="",eIn="",eOut="";
+        if(use){ const ev=(data.early||[]).find(e=>e.memberId===mem.id&&e.date===use.date); eDate=fmtMD(use.date); eIn=(ev&&ev.checkIn)||""; eOut=(ev&&ev.checkOut)||""; }
+        line(mem.name,fmtMD(b.date),fmtHM(b.totalMin),eDate,eIn,eOut);
+      });
+    });
+    const table=`<table border="1" style="border-collapse:collapse;">`
+      +`<tr><td colspan="6" ${TH}>${view.m+1}월</td></tr>`
+      +`<tr><td rowspan="2" ${TH}>사용자</td><td colspan="2" ${TH}>추가근무</td><td colspan="3" ${TH}>조퇴</td></tr>`
+      +`<tr><td ${TH}>날짜</td><td ${TH}>사용시간</td><td ${TH}>날짜</td><td ${TH}>출근시간</td><td ${TH}>퇴근시간</td></tr>`
+      +rows.join("")+`</table>`;
+    const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
+    const blob=new Blob([String.fromCharCode(0xFEFF)+html],{type:"application/vnd.ms-excel;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=`${view.y}년 ${view.m+1}월 추가근무.xls`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    flash(`${view.m+1}월 추가근무 추출 완료 (${mems.length}명)`);
+  };
+
   return (
     <div className="cal-layout">
       <section className="panel cal-main">
@@ -576,6 +630,7 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
           <div className="cal-title"><button className="navbtn" onClick={()=>move(-1)}>‹</button><strong>{view.y}년 {view.m+1}월</strong><button className="navbtn" onClick={()=>move(1)}>›</button><button className="btn small ghost" onClick={goToday}>오늘</button></div>
           <div className="rowbtns">
             <button className="btn small primary" onClick={()=>setSyncOpen(true)}>그룹웨어 싱크</button>
+            <button className="btn small ghost" onClick={exportOvertime}>추가근무 추출</button>
           </div>
         </div>
         <p className="scope">표시 범위: <strong>{scopeLabel}</strong></p>
@@ -613,6 +668,7 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
           <div style={{display:"flex",gap:8}}>
             <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("plan")}>계획 보고</button>
             <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("result")}>결과 보고</button>
+            <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("adjust")}>근무조정 보고</button>
           </div>
         </section>
         <section className="panel side-panel side-blocks">
@@ -651,7 +707,8 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
 
       {sel&&<DayDetail ds={sel} data={data} authId={authId} meUser={meUser} visibleIds={visibleIds} member={member} remainingOf={remainingOf} myBlocks={myBlocks} onClose={()=>setSel(null)} onResolveLate={onResolveLate} onResolveEarly={onResolveEarly} onMarkLinkDay={onMarkLinkDay} onDecide={onDecide} />}
       {syncOpen&&<SyncModal meUser={meUser} onGwSync={onGwSync} onProfile={onProfile} onClose={()=>setSyncOpen(false)} />}
-      {report&&<ReportModal kind={report} data={data} authId={authId} meUser={meUser} member={member} persist={persist} flash={flash} openMail={openMail} onClose={()=>setReport(null)} />}
+      {(report==="plan"||report==="result")&&<ReportModal kind={report} data={data} authId={authId} meUser={meUser} member={member} persist={persist} flash={flash} openMail={openMail} onClose={()=>setReport(null)} />}
+      {report==="adjust"&&<AdjustModal data={data} authId={authId} meUser={meUser} openMail={openMail} onClose={()=>setReport(null)} />}
     </div>
   );
 }
@@ -740,6 +797,57 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
         )}
       </div>
     </div>
+  );
+}
+
+function AdjustModal({data,authId,meUser,openMail,onClose}){
+  const pad=(n)=>String(n).padStart(2,"0");
+  const today=new Date();
+  const LS="att2:adjustCfg";
+  const saved=(()=>{ try{return JSON.parse(localStorage.getItem(LS)||"{}");}catch(e){return {};} })();
+  const [kind,setKind]=useState("퇴근");
+  const [reason,setReason]=useState(saved.reason||"개인 정비");
+  const [time,setTime]=useState(pad(today.getHours())+":"+pad(today.getMinutes()));
+  const [otId,setOtId]=useState("");
+  const [dept,setDept]=useState(saved.dept!=null?saved.dept:(meUser.dept||""));
+  const [title,setTitle]=useState(saved.title!=null?saved.title:(meUser.title||"연구원"));
+  const [teamTag,setTeamTag]=useState(saved.teamTag!=null?saved.teamTag:(meUser.dept||""));
+  const [to,setTo]=useState(saved.to||"");
+  const [cc,setCc]=useState(saved.cc||"");
+  // 기타: 내 추가근무(완료 블록) 중 선택 → "YYYY년 MM월 DD일 추가 근무 건에 대한 조퇴"
+  const myOts=data.overtime.filter(o=>o.requesterId===authId&&o.status==="completed").sort((a,b)=>a.date<b.date?1:-1);
+  const fmtEtc=(ds)=>{ const p=String(ds).split("-"); return p.length===3?(p[0]+"년 "+p[1]+"월 "+p[2]+"일 추가 근무 건에 대한 조퇴"):""; };
+  const gen=()=>{
+    const [hh,mm]=String(time||"0:0").split(":").map(n=>parseInt(n,10)||0);
+    const ot=myOts.find(o=>o.id===otId);
+    const etc=ot?fmtEtc(ot.date):"";
+    try{ localStorage.setItem(LS,JSON.stringify({reason,dept,title,teamTag,to,cc})); }catch(e){}
+    openMail(buildAdjustMail({reporter:meUser,dept,title,teamTag,kind,reason,y:today.getFullYear(),mo:today.getMonth()+1,d:today.getDate(),hh,mm,etc,to,cc}));
+  };
+  return (
+    <div className="backdrop" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <div className="modal-head"><h3>근무조정 보고</h3><button className="x" onClick={onClose}>✕</button></div>
+      <p className="dim mb">금일(<strong>{today.getFullYear()}년 {pad(today.getMonth()+1)}월 {pad(today.getDate())}일</strong>) 기준 근무조정 보고 메일을 생성합니다. 시간·사유·기타를 입력하세요.</p>
+      <div className="approver-info" style={{marginTop:0}}>조정 인원 <strong>{meUser.name}</strong></div>
+      <div className="form" style={{marginTop:12}}>
+        <Field label="구분"><select className="input" value={kind} onChange={e=>setKind(e.target.value)}><option value="퇴근">퇴근</option><option value="출근">출근</option></select></Field>
+        <Field label="조정 시간 (금일)"><input className="input" type="time" value={time} onChange={e=>setTime(e.target.value)} /></Field>
+        <Field label="조정 사유" full><input className="input" value={reason} onChange={e=>setReason(e.target.value)} placeholder="예: 개인 정비" /></Field>
+        <Field label="기타 — 내 추가근무에서 선택 (선택)" full>
+          <select className="input" value={otId} onChange={e=>setOtId(e.target.value)}>
+            <option value="">없음</option>
+            {myOts.map(o=><option key={o.id} value={o.id}>{o.date} · {fmtDur(o.totalMin)}{o.reason?(" · "+o.reason):""}</option>)}
+          </select>
+        </Field>
+        <Field label="제목 머리(팀)"><input className="input" value={teamTag} onChange={e=>setTeamTag(e.target.value)} placeholder="예: 자동화2팀" /></Field>
+        <Field label="직급"><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="예: 연구원" /></Field>
+        <Field label="소속(본문)" full><input className="input" value={dept} onChange={e=>setDept(e.target.value)} placeholder="예: 자동화 개발 파트" /></Field>
+        <Field label="받는 사람" full><input className="input" value={to} onChange={e=>setTo(e.target.value)} placeholder="예: '최부경/(협력사) 팀장/...'; '변혜원'" /></Field>
+        <Field label="참조" full><input className="input" value={cc} onChange={e=>setCc(e.target.value)} placeholder="예: Linkgenesis-autotest@lge.com" /></Field>
+      </div>
+      <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유·소속·직급·팀·받는사람·참조는 생성 시 이 기기에 저장돼 다음에 자동 입력됩니다.</p>
+      <div className="actions"><button className="btn primary" onClick={gen}>메일 초안 생성</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
+    </div></div>
   );
 }
 
