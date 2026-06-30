@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>팀 근태 관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+:root{
+  --paper:#F6F4EE; --card:#FFFFFF; --ink:#1C2536; --soft:#5A6373;
+  --amber:#BD8438; --amber-soft:#F4E8D2; --teal:#2E6A5C; --teal-soft:#DEEDE7;
+  --rust:#A8423D; --rust-soft:#F3DEDB; --line:#E4DFD3; --line-2:#EDE9DF;
+}
+*{box-sizing:border-box} html,body{margin:0;height:100%;}
+#root{height:100%;}
+body{font-family:'Pretendard',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased;}
+.boot{padding:80px;text-align:center;color:var(--soft);}
+.num,.big-balance,.pick-amt,.preview{font-variant-numeric:tabular-nums;}
+.login{min-height:100vh;display:grid;place-items:center;padding:20px;}
+.login-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px;width:100%;max-width:380px;}
+.brand.center{align-items:center;text-align:center;margin-bottom:6px;}
+.brand-mark.big{font-size:26px;}
+.login-hint{font-size:12.5px;color:var(--soft);text-align:center;margin:6px 0 18px;}
+.login-list{display:flex;flex-direction:column;gap:8px;}
+.login-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;font-family:inherit;}
+.login-row:hover{border-color:var(--amber);background:var(--amber-soft);}
+.login-name{font-weight:700;font-size:15px;flex:1;text-align:left;}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line);}
+.brand{display:flex;flex-direction:column;line-height:1.1;}
+.brand-mark{font-size:21px;font-weight:800;letter-spacing:-.02em;}
+.brand-mark span{color:var(--amber);margin:0 1px;}
+.brand-sub{font-size:11.5px;color:var(--soft);letter-spacing:.04em;margin-top:3px;}
+.who{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+.who-actions{display:flex;align-items:center;gap:12px;}
+.loginbox{display:flex;flex-direction:column;gap:8px;padding:14px 18px;}
+.approver-info{font-size:12px;color:var(--soft);background:var(--paper);border:1px solid var(--line-2);border-radius:8px;padding:8px 11px;}
+.approver-info strong{color:var(--ink);font-weight:700;}
+.who-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px;}
+.link{background:none;border:none;color:var(--soft);font-size:12px;cursor:pointer;font-family:inherit;text-decoration:underline;}
+.rolepill{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;}
+.r-member{background:#E7EAF0;color:var(--ink);} .r-pl{background:var(--amber-soft);color:#8a5e1c;} .r-lg{background:var(--teal-soft);color:var(--teal);} .r-master{background:var(--ink);color:#fff;} .r-partlead{background:#E9E1F3;color:#6b46a8;}
+.pager{display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;margin-top:14px;}
+.searchbox{margin-bottom:12px;}
+.tabs{display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--line);overflow-x:auto;}
+.tab{font-family:inherit;font-size:14px;color:var(--soft);background:none;border:none;cursor:pointer;padding:11px 14px;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--ink);}
+.tab.active{color:var(--ink);font-weight:700;border-bottom-color:var(--amber);}
+.badge{background:var(--rust);color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;}
+.app-root{display:flex;flex-direction:column;height:100%;}
+.main{margin:0 auto;padding:22px 28px 28px;flex:1;display:flex;flex-direction:column;min-height:0;width:100%;}
+.stack{display:flex;flex-direction:column;gap:18px;}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.panel-title{font-size:16px;font-weight:800;margin:0;}
+.panel-sub{font-size:13px;color:var(--soft);margin:4px 0 14px;}
+.dim{color:var(--soft);font-size:12.5px;} .mt{margin-top:12px;}
+.cal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.cal-title{display:flex;align-items:center;gap:8px;font-size:17px;}
+.navbtn{width:32px;height:32px;border:1px solid var(--line);background:var(--card);border-radius:9px;cursor:pointer;font-size:18px;color:var(--ink);line-height:1;}
+.navbtn:hover{border-color:var(--ink);}
+.scope{font-size:12.5px;color:var(--soft);margin:10px 0 0;}
+.cal-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:stretch;flex:1;min-height:0;}
+.cal-main{min-width:0;display:flex;flex-direction:column;min-height:0;}
+.cal-side{display:flex;flex-direction:column;gap:18px;align-self:stretch;min-height:0;}
+.side-panel{padding:16px 18px;}
+.side-blocks{flex:1;min-height:0;display:flex;flex-direction:column;}
+.side-blocks-list{flex:1;min-height:0;overflow:auto;}
+.side-panel .panel-title{font-size:15px;}
+.sideform{display:flex;flex-direction:column;gap:11px;}
+.sideform .ta{min-height:56px;}
+.fullw{width:100%;justify-content:center;margin-bottom:6px;}
+.mb{margin-bottom:12px;}
+.subtabs{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+.subtabs button{flex:1;font-family:inherit;font-size:13.5px;font-weight:700;padding:9px 8px;border:none;background:var(--card);color:var(--soft);cursor:pointer;}
+.subtabs button.on{background:var(--ink);color:#fff;}
+.side-sub{margin:0 0 12px;}
+.rowbtns{display:flex;gap:6px;flex-shrink:0;}
+.ev-pending{background:#41506b;color:#fff;}
+.sw-pending{background:#41506b;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 14px;font-size:11.5px;color:var(--soft);}
+.legend span{display:flex;align-items:center;gap:5px;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block;}
+.sw-late{background:var(--rust);} .sw-fixed{background:var(--teal);} .sw-early{background:#7a5ea8;}
+.sw-otun{background:var(--amber);} .sw-otpart{background:var(--amber-soft);border:1px solid var(--amber);} .sw-otdone{background:var(--line-2);border:1px solid var(--line);}
+.cal-wdrow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:5px;flex:1;min-height:0;}
+.cal-wd{text-align:center;font-size:11.5px;color:var(--soft);font-weight:700;padding:4px 0;}
+.cal-wd.sun{color:var(--rust);} .cal-wd.sat{color:#3a6ea5;}
+.cal-cell{min-height:62px;height:100%;border:1px solid var(--line-2);border-radius:10px;background:var(--card);cursor:pointer;padding:5px;display:flex;flex-direction:column;align-items:stretch;gap:3px;font-family:inherit;overflow:hidden;text-align:left;}
+.cal-cell:hover{border-color:var(--amber);}
+.cal-cell.empty-cell{background:transparent;border:none;cursor:default;}
+.cal-cell.today{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
+.cal-cell.sel{background:var(--amber-soft);border-color:var(--amber);}
+.cal-num{font-size:13px;font-weight:600;align-self:flex-start;}
+.cal-num.sun{color:var(--rust);} .cal-num.sat{color:#3a6ea5;}
+.cal-events{display:flex;flex-direction:column;gap:2px;overflow:hidden;}
+.ev{font-size:10px;line-height:1.35;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ev b{font-weight:700;}
+.ev-late{background:var(--rust);color:#fff;}
+.ev-fixed{background:var(--teal);color:#fff;}
+.ev-early{background:#7a5ea8;color:#fff;}
+.ev-otun{background:var(--amber);color:#fff;}
+.ev-otpart{background:var(--amber-soft);color:#8a5e1c;border:1px solid var(--amber);}
+.ev-otdone{background:var(--line-2);color:var(--soft);text-decoration:line-through;}
+.ev-more{font-size:10px;color:var(--soft);padding:0 4px;}
+.day-sec{border-top:1px solid var(--line-2);padding:13px 0;}
+.day-sec:first-of-type{border-top:none;}
+.day-sec h4{margin:0 0 9px;font-size:13px;color:var(--soft);}
+.day-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;flex-wrap:wrap;}
+.addlate{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.addlate .input{width:auto;flex:1;min-width:120px;} .addlate .mini{flex:none;width:80px;}
+.resolve{display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.resolve-list{display:flex;gap:6px;flex-wrap:wrap;}
+.tablewrap{overflow-x:auto;}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{text-align:left;font-size:11.5px;color:var(--soft);font-weight:700;padding:8px 10px;border-bottom:1.5px solid var(--line);}
+.tbl td{padding:10px;border-bottom:1px solid var(--line-2);}
+.tbl .r{text-align:right;} .tbl tr:hover td{background:var(--paper);}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.field{display:flex;flex-direction:column;gap:6px;} .field.full{grid-column:1/-1;}
+.flabel{font-size:12.5px;color:var(--soft);font-weight:600;}
+.input{font-family:inherit;font-size:14px;color:var(--ink);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);width:100%;}
+.input:focus-visible{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber);}
+.input.mini{padding:6px 9px;font-size:13px;width:auto;}
+.ta{min-height:70px;resize:vertical;}
+.actions{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap;}
+.btn{font-family:inherit;font-size:14px;font-weight:700;padding:10px 18px;border-radius:10px;border:1px solid transparent;cursor:pointer;}
+.btn.small{padding:7px 13px;font-size:13px;}
+.btn.primary{background:var(--ink);color:#fff;} .btn.primary:hover{background:#283449;}
+.btn.ghost{background:var(--card);color:var(--ink);border-color:var(--line);} .btn.ghost:hover{border-color:var(--ink);}
+.btn.danger{background:var(--rust-soft);color:var(--rust);} .btn.danger:hover{background:#ecccc8;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+.cards{display:flex;flex-direction:column;gap:12px;}
+.reccard{border:1px solid var(--line);border-radius:13px;padding:15px 16px;background:var(--card);}
+.reccard-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.reccard-reason{font-size:13.5px;margin:9px 0;line-height:1.5;}
+.reccard-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--soft);}
+.reccard-meta .amt{color:var(--amber);font-weight:700;}
+.logbox{margin-top:13px;padding-top:13px;border-top:1px dashed var(--line);}
+.logbox-hint{font-size:12px;color:var(--soft);margin:0 0 9px;}
+.time-row{display:flex;align-items:flex-start;gap:9px;} .time-row .field{flex:1;}
+.calc{font-size:12.5px;margin:0;} .calc strong{color:var(--amber);font-weight:700;}
+.login-err{color:var(--rust);font-size:12.5px;margin:8px 0 0;text-align:center;}
+.arrow{color:var(--soft);} .preview{font-weight:700;color:var(--amber);}
+.proj-pl{display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap;}
+.chip{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.s-wait{background:var(--amber-soft);color:#8a5e1c;} .s-ok{background:var(--teal-soft);color:var(--teal);}
+.s-no{background:var(--rust-soft);color:var(--rust);} .s-done{background:#E7EAF0;color:var(--ink);}
+.s-ot{background:var(--amber-soft);color:#8a5e1c;}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line-2);}
+.item:last-child{border-bottom:none;}
+.item-main{display:flex;align-items:center;gap:9px;font-size:13.5px;}
+.tag{font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-soft);padding:2px 8px;border-radius:6px;}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;}
+.x{border:none;background:none;color:var(--soft);cursor:pointer;font-size:13px;padding:6px;} .x:hover{color:var(--rust);}
+.picklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;}
+.pick{font-family:inherit;text-align:left;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 12px;display:flex;flex-direction:column;gap:3px;}
+.pick:hover{border-color:var(--amber);} .pick.on{border-color:var(--amber);background:var(--amber-soft);}
+.pick-date{font-size:11px;color:var(--soft);} .pick-amt{font-size:17px;font-weight:800;} .pick-proj{font-size:11.5px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rec{font-size:9px;font-weight:700;color:#fff;background:var(--teal);border-radius:8px;padding:0 6px;margin-left:6px;}
+.warnline{font-size:12px;color:#8a5e1c;background:var(--amber-soft);border:1px solid var(--amber);border-radius:8px;padding:8px 11px;margin-top:12px;}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.seg button{font-family:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border:none;background:var(--card);color:var(--soft);cursor:pointer;}
+.seg button.on{background:var(--ink);color:#fff;} .seg button:disabled{color:#c2bdb1;cursor:not-allowed;}
+.chips-pick{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;}
+.mchip{font-family:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--line);border-radius:20px;background:var(--card);cursor:pointer;}
+.mchip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+.big-balance{font-size:26px;font-weight:800;color:var(--amber);} .big-balance.sm{font-size:22px;}
+.note{background:var(--paper);border:1px solid var(--line-2);border-radius:12px;padding:13px 16px;margin-bottom:16px;}
+.note strong{font-size:13px;} .note ul{margin:8px 0 0;padding-left:18px;} .note li{font-size:12.5px;color:var(--soft);line-height:1.7;}
+.empty{padding:24px 18px;text-align:center;color:var(--soft);font-size:13.5px;background:var(--paper);border:1px dashed var(--line);border-radius:12px;line-height:1.6;}
+.backdrop{position:fixed;inset:0;background:rgba(28,37,54,.45);display:grid;place-items:center;padding:18px;z-index:50;}
+.modal{background:var(--card);border-radius:16px;width:100%;max-width:520px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:88vh;overflow:auto;}
+.modal.wide{max-width:680px;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;} .modal-head h3{margin:0;font-size:16px;}
+.mail{width:100%;min-height:230px;font-family:Menlo,monospace;font-size:12.5px;line-height:1.6;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);resize:vertical;white-space:pre-wrap;}
+.mailprev{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff;max-height:52vh;overflow:auto;user-select:text;}
+.reptable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
+.reptable th,.reptable td{border:1px solid var(--line);padding:6px 8px;vertical-align:middle;}
+.reptable th{background:var(--paper);font-weight:700;}
+.reptable td.c{text-align:center;}
+.reptable textarea{width:100%;min-height:48px;border:none;background:transparent;resize:vertical;font-family:inherit;font-size:12.5px;color:var(--ink);}
+.reptable textarea:focus-visible{outline:2px solid var(--amber);outline-offset:-2px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 20px;border-radius:24px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.25);}
+@media(max-width:820px){
+  .cal-layout{grid-template-columns:1fr;flex:none;} .cal-side{align-self:auto;}
+  .side-blocks{flex:none;} .side-blocks-list{max-height:60vh;}
+  .main{display:block;} .cal-main{display:block;} .cal-days{grid-auto-rows:minmax(72px,auto);flex:none;}
+}
+@media(max-width:560px){
+  .form{grid-template-columns:1fr;} .topbar{padding:14px 16px;} .main{padding:18px 12px 50px;}
+  .cal-cell{padding:3px;border-radius:8px;min-height:66px;} .cal-num{font-size:11px;} .ev{font-size:8.5px;padding:1px 3px;}
+}
+</style>
+</head>
+<body>
+<div id="root"><div class="boot">불러오는 중…</div></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+// ── 공유 데이터 저장소 ──
+//   att2:data → 서버(/api/data)에 공유 저장 (모든 사용자가 같은 데이터, 서버 재시작에도 유지).
+//              서버에 못 붙으면 localStorage로 폴백(file:// 단독 실행 시).
+//   그 외 키(att2:auth, att2:gw:*) → 기기 로컬(localStorage)에만 저장.
+const mem = {};
+const DATA_API = "/api/data";
+let _dataRev = 0;             // 서버 데이터 리비전 (폴링 비교용)
+let _serverOk = false;        // 서버 사용 가능 여부
+async function sGet(k){
+  if(k==="att2:data"){
+    try{
+      const r=await fetch(DATA_API,{cache:"no-store"});
+      if(r.ok){ const j=await r.json(); if(j&&j.ok){ _serverOk=true; _dataRev=j.rev||0; return j.data!=null?{value:JSON.stringify(j.data)}:null; } }
+    }catch(e){ _serverOk=false; }
+    try { const v = localStorage.getItem(k); return v==null?null:{value:v}; } catch(e){}
+    return mem[k]!=null ? {value:mem[k]} : null;
+  }
+  try { const v = localStorage.getItem(k); return v==null?null:{value:v}; } catch(e){}
+  return mem[k]!=null ? {value:mem[k]} : null;
+}
+async function sSet(k,v){
+  if(k==="att2:data"){
+    try{
+      const r=await fetch(DATA_API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:JSON.parse(v)})});
+      if(r.ok){ const j=await r.json(); _serverOk=true; if(j&&j.rev) _dataRev=j.rev; }
+    }catch(e){ _serverOk=false; }
+    try { localStorage.setItem(k,v); } catch(e){ mem[k]=v; } // 로컬 백업
+    return;
+  }
+  try { localStorage.setItem(k,v); return; } catch(e){}
+  mem[k]=v;
+}
+async function sGetLocal(k){ try{ const v=localStorage.getItem(k); return v==null?null:{value:v}; }catch(e){ return mem[k]!=null?{value:mem[k]}:null; } }
+async function sSetLocal(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+
+// ── 그룹웨어 연동: 자격증명은 기기 로컬에만 저장 (공유 데이터에 비밀번호를 넣지 않음) ──
+//   싱크 API 기본 주소 = 페이지를 서빙한 서버(같은 출처). file://로 열면 localhost로 폴백.
+const DEFAULT_GW_API=(typeof location!=="undefined"&&location.protocol&&location.protocol.indexOf("http")===0)?location.origin:"http://localhost:3939";
+async function gwCredGet(memberId){ const r=await sGetLocal("att2:gw:"+memberId); if(r&&r.value){ try{ return JSON.parse(r.value); }catch(e){} } return {gwId:"",gwPw:""}; }
+async function gwCredSet(memberId,obj){ await sSetLocal("att2:gw:"+memberId, JSON.stringify(obj)); }
+async function gwApiGet(){ const r=await sGetLocal("att2:gwapi"); return (r&&r.value)||DEFAULT_GW_API; }
+async function gwApiSet(u){ await sSetLocal("att2:gwapi", (u||"").trim()||DEFAULT_GW_API); }
+// 최근 N개월 "YYYY-MM" 목록 (현재월 우선)
+function recentMonths(n){ const out=[]; const d=new Date(); d.setDate(1); for(let i=0;i<n;i++){ out.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); d.setMonth(d.getMonth()-1); } return out; }
+// 보고 메일 기본 수신자 (이미지 기준 · 프로젝트별로 덮어쓰기 가능)
+const REPORT_TO_DEFAULT="'최부경'; sw125.jung@lgepartner.com";
+const REPORT_CC_DEFAULT="Linkgenensis-autotest@lge.com";
+const escHtml=(s)=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// 연장근무 계획/결과 보고 메일(HTML+텍스트) 생성
+function buildReportMail({kind,project,date,to,cc,reporter,rows}){
+  const ymd=String(date).replace(/-/g,"/");
+  const kindLabel=kind==="result"?"결과":"계획";
+  const subject="[보고] "+project.name+" 프로젝트 연장 근무 "+kindLabel+" 보고 ("+ymd+")";
+  const reporterLine="링크제니시스 "+reporter.name+(reporter.title?(" "+reporter.title):"")+"입니다.";
+  const showLeave=kind==="result";
+  const br=(s)=>escHtml(s).replace(/\n/g,"<br>");
+  const TH='style="border:1px solid #555;padding:6px 12px;background:#e8efe0;font-weight:700;text-align:center;"';
+  const TD='style="border:1px solid #555;padding:6px 12px;vertical-align:middle;"';
+  const TC='style="border:1px solid #555;padding:6px 12px;vertical-align:middle;text-align:center;"';
+  let head="<th "+TH+">프로젝트</th><th "+TH+">담당자</th><th "+TH+">연장근무 사유</th>"+(showLeave?("<th "+TH+">퇴근 시간</th>"):"")+"<th "+TH+">비고</th>";
+  let bodyRows="";
+  rows.forEach((r,i)=>{
+    bodyRows+="<tr>";
+    if(i===0) bodyRows+="<td "+TC+" rowspan=\""+rows.length+"\">"+escHtml(project.name)+"</td>";
+    bodyRows+="<td "+TC+">"+escHtml(r.name)+"</td>";
+    bodyRows+="<td "+TD+">"+br(r.reason)+"</td>";
+    if(showLeave) bodyRows+="<td "+TC+">"+escHtml(r.leave||"")+"</td>";
+    bodyRows+="<td "+TD+"></td>";
+    bodyRows+="</tr>";
+  });
+  const table="<table style=\"border-collapse:collapse;font-size:13px;\"><thead><tr>"+head+"</tr></thead><tbody>"+bodyRows+"</tbody></table>";
+  const html="<div style=\"font-family:'Malgun Gothic',sans-serif;font-size:13px;color:#1c2536;line-height:1.6;\">"
+    +"<p>안녕하십니까<br>"+escHtml(reporterLine)+"</p>"
+    +"<p>"+escHtml(project.name)+" 연장 근무 "+kindLabel+" 보고 드립니다.</p>"
+    +table
+    +"<p>이상입니다.<br>감사합니다.</p>"
+    +"</div>";
+  const tl=[];
+  tl.push("안녕하십니까"); tl.push(reporterLine); tl.push("");
+  tl.push(project.name+" 연장 근무 "+kindLabel+" 보고 드립니다."); tl.push("");
+  rows.forEach(r=>{ tl.push("· "+r.name+(showLeave&&r.leave?(" (퇴근 "+r.leave+")"):"")+" : "+String(r.reason||"").replace(/\n/g," / ")); });
+  tl.push(""); tl.push("이상입니다."); tl.push("감사합니다.");
+  return {title:subject, to, cc, html, text:tl.join("\n")};
+}
+
+// ── helpers ──
+const BASE=17*60+30, HALF=240, WD=["일","월","화","수","목","금","토"];
+const ROLE_LABEL={member:"팀원",partlead:"파트장",pl:"PL",lg:"스탭",master:"마스터"};
+const toMin=(t)=>{ if(!t||!t.includes(":"))return null; const [h,m]=t.split(":").map(Number); return Number.isNaN(h)||Number.isNaN(m)?null:h*60+m; };
+const fmtDur=(min)=>{ if(min==null)return"-"; const h=Math.floor(min/60),m=min%60; if(h&&m)return h+"시간 "+m+"분"; if(h)return h+"시간"; return m+"분"; };
+const calcOvertime=(s,e)=>{ const a=toMin(s),b=toMin(e); if(a==null||b==null)return 0; return Math.max(0,b-Math.max(BASE,a)); };
+const uid=()=>Math.random().toString(36).slice(2,9);
+const ymd=(d)=>d.toISOString().slice(0,10);
+const today=()=>ymd(new Date());
+const shift=(n)=>{ const d=new Date(); d.setDate(d.getDate()+n); return ymd(d); };
+const STATUS={ pending_pl:{label:"PL 승인 대기",cls:"s-wait"}, pending_lg:{label:"스탭 승인 대기",cls:"s-wait"}, approved:{label:"승인 완료",cls:"s-ok"}, rejected:{label:"반려",cls:"s-no"}, completed:{label:"적립 완료",cls:"s-done"} };
+
+const DATA_VER=3;
+// 인명록.xlsx 기반 실제 인원 (자동화1파트 / 자동화2파트)
+const ROSTER=[
+  {name:"박헌진",dept:"자동화1파트",email:"hjpark@linkgenesis.co.kr",phone:"010-2937-6482"},
+  {name:"정승원",dept:"자동화1파트",email:"swjung@linkgenesis.co.kr",phone:"010-8721-4889"},
+  {name:"변혜원",dept:"자동화2파트",email:"hwbyeon@linkgenesis.co.kr",phone:"010-6354-8314"},
+  {name:"강민정",dept:"자동화2파트",email:"mjgang@linkgenesis.co.kr",phone:"010-4062-6190"},
+  {name:"강민지",dept:"자동화2파트",email:"mjkang@linkgenesis.co.kr",phone:"010-8954-6190"},
+  {name:"연수지",dept:"자동화1파트",email:"sjyeon@linkgenesis.co.kr",phone:"010-6855-3642"},
+  {name:"최다민",dept:"자동화1파트",email:"dmchoi@linkgenesis.co.kr",phone:"010-9962-2300"},
+  {name:"김재형",dept:"자동화2파트",email:"jhkim2@linkgenesis.co.kr",phone:"010-4309-4149"},
+  {name:"정영훈",dept:"자동화1파트",email:"yhjung@linkgenesis.co.kr",phone:"010-4620-5732"},
+  {name:"이수정",dept:"자동화2파트",email:"sjlee1@linkgenesis.co.kr",phone:"010-9808-9312"},
+  {name:"김영한",dept:"자동화2파트",email:"yhkim2@linkgenesis.co.kr",phone:"010-2333-6008"},
+  {name:"주창모",dept:"자동화1파트",email:"cmjoo@linkgenesis.co.kr",phone:"010-9621-0908"},
+  {name:"신진혁",dept:"자동화2파트",email:"jhsin@linkgenesis.co.kr",phone:"010-2264-8019"},
+  {name:"천동석",dept:"자동화2파트",email:"dscheon@linkgenesis.co.kr",phone:"010-2671-6692"},
+  {name:"김현찬",dept:"자동화1파트",email:"hckim@linkgenesis.co.kr",phone:"010-6245-9987"},
+  {name:"김기원",dept:"자동화2파트",email:"kwkim@linkgenesis.co.kr",phone:"010-6356-3883"},
+  {name:"김민정",dept:"자동화2파트",email:"mjkim@linkgenesis.co.kr",phone:"010-2898-9689"},
+  {name:"주석윤",dept:"자동화2파트",email:"syju@linkgenesis.co.kr",phone:"010-5705-5368"},
+  {name:"최세진",dept:"자동화2파트",email:"sjchoi1@linkgenesis.co.kr",phone:"010-7677-3569"},
+  {name:"오주영",dept:"자동화2파트",email:"jyoh@linkgenesis.co.kr",phone:"010-8622-5620"},
+  {name:"이수형",dept:"자동화1파트",email:"shlee1@linkgenesis.co.kr",phone:"010-3482-5246"},
+  {name:"오승연",dept:"자동화1파트",email:"syoh@linkgenesis.co.kr",phone:"010-2108-5051"},
+  {name:"한철현",dept:"자동화2파트",email:"chhan@linkgenesis.co.kr",phone:"010-9553-9702"},
+  {name:"백주한",dept:"자동화1파트",email:"jhbaek@linkgenesis.co.kr",phone:"010-2572-4362"},
+  {name:"탁태우",dept:"자동화2파트",email:"tutak@linkgenesis.co.kr",phone:"010-8631-3126"},
+  {name:"정승호",dept:"자동화1파트",email:"shjeong@linkgenesis.co.kr",phone:"010-9150-2844"},
+  {name:"장선경",dept:"자동화2파트",email:"skjang@linkgenesis.co.kr",phone:"010-2171-9843"},
+  {name:"전승원",dept:"자동화1파트",email:"swjeon@linkgenesis.co.kr",phone:"010-2663-7368"},
+  {name:"민병선",dept:"자동화1파트",email:"bsmin@linkgenesis.co.kr",phone:"010-9971-7436"},
+  {name:"박철웅",dept:"자동화1파트",email:"cupark@linkgenesis.co.kr",phone:"010-3982-2266"},
+  {name:"양재연",dept:"자동화2파트",email:"jyyang@linkgenesis.co.kr",phone:"010-5710-2605"},
+  {name:"장준영",dept:"자동화1파트",email:"jyjang@linkgenesis.co.kr",phone:"010-4045-8318"},
+  {name:"김현성",dept:"자동화1파트",email:"hskim1@linkgenesis.co.kr",phone:"010-5025-4324"},
+  {name:"지솔아",dept:"자동화2파트",email:"saji@linkgenesis.co.kr",phone:"010-2267-6087"},
+  {name:"박준희",dept:"자동화2파트",email:"jhpark@linkgenesis.co.kr",phone:"010-6254-9038"},
+  {name:"이근택",dept:"자동화2파트",email:"ktlee@linkgenesis.co.kr",phone:"010-9550-9156"},
+  {name:"송주아",dept:"자동화1파트",email:"jasong@linkgenesis.co.kr",phone:"010-3117-4815"},
+  {name:"김민수",dept:"자동화2파트",email:"mskim@linkgenesis.co.kr",phone:"010-9361-9284"},
+  {name:"정혜인",dept:"자동화1파트",email:"hijeong@linkgenesis.co.kr",phone:"010-6264-0385"},
+  {name:"백인하",dept:"자동화2파트",email:"ihbaek@linkgenesis.co.kr",phone:"010-9553-7894"},
+  {name:"조아요",dept:"자동화1파트",email:"ayjo@linkgenesis.co.kr",phone:"010-9751-1270"},
+  {name:"이동규",dept:"자동화1파트",email:"dglee@linkgenesis.co.kr",phone:"010-7735-1327"},
+  {name:"유하은",dept:"자동화2파트",email:"huyu@linkgenesis.co.kr",phone:"010-3631-1613"},
+];
+const SEED=()=>({
+  ver:DATA_VER,
+  members:[
+    {id:"admin",name:"admin",role:"master",pw:"admin",dept:"",email:"",phone:""},
+    ...ROSTER.map((p,i)=>({id:"u"+(i+1),name:p.name,role:"member",pw:"1",dept:p.dept,email:p.email,phone:p.phone})),
+  ],
+  projects:[],
+  overtime:[],
+  usage:[],
+  late:[],
+  early:[],
+  otReports:[],
+});
+
+function App(){
+  const [loading,setLoading]=useState(true);
+  const [data,setData]=useState(SEED());
+  const [authId,setAuthId]=useState(null);
+  const [manageOpen,setManageOpen]=useState(false);
+  const [profileOpen,setProfileOpen]=useState(false);
+  const [modal,setModal]=useState(null);
+  const [toast,setToast]=useState("");
+
+  useEffect(()=>{ (async()=>{
+    const d=await sGet("att2:data");
+    let loaded=null;
+    if(d&&d.value){ try{ loaded=JSON.parse(d.value); }catch(e){} }
+    // 인명록 반영: 구버전(임시 인원) 데이터는 실제 인명록 SEED로 교체
+    if(!loaded || loaded.ver!==DATA_VER) loaded=SEED();
+    // 마스터 계정(admin) 보장 (방어)
+    if(!loaded.members.some(m=>m.id==="admin")) loaded.members=[{id:"admin",name:"admin",role:"master",pw:"admin",dept:"",email:"",phone:""},...loaded.members];
+    if(!Array.isArray(loaded.early)) loaded.early=[]; // 조퇴 내역 (구버전 데이터 보강)
+    if(!Array.isArray(loaded.otReports)) loaded.otReports=[]; // 연장근무 보고 사유 (구버전 보강)
+    setData(loaded); await sSet("att2:data",JSON.stringify(loaded));
+    const a=await sGetLocal("att2:auth"); if(a&&a.value) setAuthId(a.value);
+    setLoading(false);
+  })(); },[]);
+
+  // 다른 사용자의 변경을 주기적으로 반영 (서버 공유 데이터)
+  useEffect(()=>{ if(loading) return;
+    const iv=setInterval(async()=>{
+      try{ const r=await fetch(DATA_API,{cache:"no-store"}); if(!r.ok)return; const j=await r.json();
+        if(j&&j.ok&&j.data&&(j.rev||0)!==_dataRev){ _dataRev=j.rev||0; setData(j.data); } }catch(e){}
+    },5000);
+    return ()=>clearInterval(iv);
+  },[loading]);
+
+  const persist=(next)=>{ setData(next); sSet("att2:data",JSON.stringify(next)); };
+  const login=(id)=>{ setAuthId(id); sSetLocal("att2:auth",id); };
+  const logout=()=>{ setAuthId(null); sSetLocal("att2:auth",""); setManageOpen(false); setProfileOpen(false); };
+  const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),2200); };
+  const member=(id)=>data.members.find(x=>x.id===id);
+  const updateMember=(id,patch)=>persist({...data,members:data.members.map(m=>m.id===id?{...m,...patch}:m)});
+
+  const remainingOf=(otId)=>{ const ot=data.overtime.find(o=>o.id===otId); if(!ot||ot.status!=="completed")return 0;
+    const used=data.usage.filter(u=>u.sourceId===otId&&u.status!=="rejected").reduce((a,u)=>a+u.minutes,0); return Math.max(0,ot.totalMin-used); };
+
+  if(loading) return <div className="boot">불러오는 중…</div>;
+  if(!authId||!member(authId)) return <Login members={data.members} onLogin={login} />;
+
+  const meUser=member(authId);
+  const visibleIds=(()=>{
+    if(meUser.role==="lg"||meUser.role==="master") return data.members.map(m=>m.id);
+    if(meUser.role==="partlead"){ const ids=new Set([meUser.id]); if(meUser.dept) data.members.forEach(m=>{ if(m.dept===meUser.dept) ids.add(m.id); }); return [...ids]; }
+    if(meUser.role==="pl"){ const led=data.projects.filter(p=>p.plId===meUser.id); const ids=new Set([meUser.id]); led.forEach(p=>p.memberIds.forEach(id=>ids.add(id))); return [...ids]; }
+    return [meUser.id];
+  })();
+  const scopeLabel=(meUser.role==="lg"||meUser.role==="master")?"전체 인원":meUser.role==="partlead"?("같은 파트"+(meUser.dept?(" ("+meUser.dept+")"):"")):meUser.role==="pl"?"내 프로젝트 팀원 + 본인":"본인";
+  const myBlocks=data.overtime.filter(o=>o.requesterId===authId&&o.status==="completed").map(o=>({...o,remaining:remainingOf(o.id)})).sort((a,b)=>a.date<b.date?1:-1);
+
+  const addOvertime=(f)=>{ persist({...data,overtime:[{id:uid(),requesterId:authId,projectId:f.projectId,date:f.date,reason:f.reason,plId:f.plId,lgId:f.lgId,start:f.start,end:f.end,totalMin:f.totalMin,status:"pending_pl"},...data.overtime]}); flash("추가근무 신청을 등록했어요."); };
+  const decide=(kind,id,ok)=>{ const key=kind==="ot"?"overtime":"usage";
+    persist({...data,[key]:data[key].map(r=>{ if(r.id!==id)return r; if(!ok)return{...r,status:"rejected"}; if(r.status==="pending_pl")return{...r,status:"pending_lg"}; if(r.status==="pending_lg")return{...r,status:key==="overtime"?"completed":"approved"}; return r; })});
+    flash(ok?"승인했어요.":"반려했어요."); };
+  const addLate=(date,lateMinutes,reason)=>{ persist({...data,late:[{id:uid(),memberId:authId,date,lateMinutes,reason,resolvedUsageId:null},...data.late]}); flash("지각을 등록했어요."); };
+  const resolveLate=(lateId,blockId)=>{ const late=data.late.find(l=>l.id===lateId); const block=data.overtime.find(o=>o.id===blockId); if(!late||!block)return;
+    if(remainingOf(blockId)!==block.totalMin)return flash("이미 사용한 블록이에요.");
+    if(block.totalMin<late.lateMinutes)return flash("이 블록("+fmtDur(block.totalMin)+")이 지각보다 짧아요.");
+    const usageId=uid();
+    persist({...data,
+      usage:[{id:usageId,requesterId:authId,sourceId:blockId,type:"지각 상계",minutes:block.totalMin,date:late.date,reason:"지각 상계",plId:"",lgId:"",status:"approved"},...data.usage],
+      late:data.late.map(l=>l.id===lateId?{...l,resolvedUsageId:usageId}:l)});
+    flash("추가근무 블록("+fmtDur(block.totalMin)+")으로 지각을 해소했어요."); };
+  const resolveEarly=(earlyId,blockId)=>{ const ev=(data.early||[]).find(l=>l.id===earlyId); const block=data.overtime.find(o=>o.id===blockId); if(!ev||!block)return;
+    if(remainingOf(blockId)!==block.totalMin)return flash("이미 사용한 블록이에요.");
+    if(block.totalMin<ev.earlyMinutes)return flash("이 블록("+fmtDur(block.totalMin)+")이 조퇴보다 짧아요.");
+    const usageId=uid();
+    persist({...data,
+      usage:[{id:usageId,requesterId:authId,sourceId:blockId,type:"조퇴",minutes:block.totalMin,date:ev.date,reason:"조퇴 상계",plId:"",lgId:"",status:"approved"},...data.usage],
+      early:data.early.map(l=>l.id===earlyId?{...l,resolvedUsageId:usageId}:l)});
+    flash("추가근무 블록("+fmtDur(block.totalMin)+")으로 조퇴를 등록했어요."); };
+  // 링크데이(회사 행사) 조퇴: 추가근무 상계 없이 "링크데이 참석"으로 수동 등록
+  const markEarlyLinkDay=(earlyId)=>{ const ev=(data.early||[]).find(l=>l.id===earlyId); if(!ev)return;
+    persist({...data,early:data.early.map(l=>l.id===earlyId?{...l,linkDay:true,reason:"링크데이 참석"}:l)});
+    flash("링크데이 참석으로 등록했어요."); };
+  const resetAll=()=>{ if(confirm("모든 기록을 초기화할까요?")){ persist(SEED()); flash("초기화했어요."); } };
+
+  // 그룹웨어 싱크 결과를 지각/초과근무/조퇴로 자동 등록 (syncKey로 중복 방지)
+  const applyGwSync=(days)=>{
+    const myProj=data.projects.find(p=>p.memberIds.includes(authId)||p.plId===authId)||null;
+    const existLate=new Set(data.late.filter(l=>l.syncKey).map(l=>l.syncKey));
+    const existOt=new Set(data.overtime.filter(o=>o.syncKey).map(o=>o.syncKey));
+    const existEarly=new Set((data.early||[]).filter(l=>l.syncKey).map(l=>l.syncKey));
+    const newLate=[],newOt=[],newEarly=[],items=[]; let addedLate=0,addedOt=0,addedEarly=0,dup=0;
+    (days||[]).forEach(d=>{
+      if(d.isHoliday) return;
+      if(d.lateMinutes>0){
+        const k="gw:late:"+authId+":"+d.date;
+        if(existLate.has(k)){ dup++; }
+        else{ newLate.push({id:uid(),memberId:authId,date:d.date,lateMinutes:d.lateMinutes,reason:"그룹웨어 싱크"+(d.event?(" · "+d.event):""),resolvedUsageId:null,syncKey:k}); existLate.add(k); addedLate++; items.push({date:d.date,type:"지각",min:d.lateMinutes,event:d.event}); }
+      }
+      if(d.earlyMinutes>0){
+        const k="gw:early:"+authId+":"+d.date;
+        if(existEarly.has(k)){ dup++; }
+        else{ const isLink=!!d.linkDay; newEarly.push({id:uid(),memberId:authId,date:d.date,earlyMinutes:d.earlyMinutes,reason:isLink?"링크데이 참석":("그룹웨어 조퇴 싱크"+(d.event?(" · "+d.event):"")),resolvedUsageId:null,linkDay:isLink,syncKey:k}); existEarly.add(k); addedEarly++; items.push({date:d.date,type:isLink?"조퇴(링크데이)":"조퇴",min:d.earlyMinutes,event:isLink?"링크데이 참석":d.event}); }
+      }
+      if(d.overtimeMinutes>0){
+        const k="gw:ot:"+authId+":"+d.date;
+        if(existOt.has(k)){ dup++; }
+        else{ newOt.push({id:uid(),requesterId:authId,projectId:myProj?myProj.id:"",date:d.date,reason:"그룹웨어 자동 싱크"+(d.event?(" · "+d.event):""),plId:myProj?myProj.plId||"":"",lgId:myProj?myProj.lgId||"":"",start:d.schedEnd,end:d.checkOut||"",totalMin:d.overtimeMinutes,status:"completed",syncKey:k}); existOt.add(k); addedOt++; items.push({date:d.date,type:"초과근무",min:d.overtimeMinutes,event:d.event}); }
+      }
+    });
+    if(newLate.length||newOt.length||newEarly.length) persist({...data,late:[...newLate,...data.late],overtime:[...newOt,...data.overtime],early:[...newEarly,...(data.early||[])]});
+    items.sort((a,b)=>a.date<b.date?-1:1);
+    return {addedLate,addedOt,addedEarly,dup,items,hasProject:!!myProj};
+  };
+
+
+
+  return (
+    <div className="app-root">
+      <header className="topbar">
+        <div className="brand"><span className="brand-mark">팀 근태 관리</span></div>
+      </header>
+      <main className="main">
+        <Calendar data={data} authId={authId} meUser={meUser} visibleIds={visibleIds} scopeLabel={scopeLabel} remainingOf={remainingOf} member={member} myBlocks={myBlocks} persist={persist} flash={flash} onAddOvertime={addOvertime} onAddLate={addLate} onResolveLate={resolveLate} onDecide={decide} openMail={setModal} onManage={()=>setManageOpen(true)} onLogout={logout} onProfile={()=>setProfileOpen(true)} onGwSync={applyGwSync} onResolveEarly={resolveEarly} onMarkLinkDay={markEarlyLinkDay} />
+      </main>
+      {profileOpen&&(
+        <ProfileModal user={meUser} onSave={(patch)=>{updateMember(meUser.id,patch);}} flash={flash} onClose={()=>setProfileOpen(false)} />
+      )}
+      {manageOpen&&(meUser.role==="pl"||meUser.role==="lg"||meUser.role==="master")&&(
+        <div className="backdrop" onClick={()=>setManageOpen(false)}>
+          <div className="modal wide" onClick={(e)=>e.stopPropagation()}>
+            <div className="modal-head"><h3>팀원·프로젝트 관리</h3><button className="x" onClick={()=>setManageOpen(false)}>✕</button></div>
+            <Manage data={data} persist={persist} flash={flash} onReset={resetAll} />
+          </div>
+        </div>
+      )}
+      {modal&&<MailModal modal={modal} onClose={()=>setModal(null)} flash={flash} />}
+      {toast&&<div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+function Login({members,onLogin}){
+  const [name,setName]=useState("");
+  const [pw,setPw]=useState("");
+  const [err,setErr]=useState("");
+  const submit=()=>{
+    const u=members.find(m=>m.name===name.trim());
+    if(!u){ setErr("이름을 찾을 수 없어요."); return; }
+    if((u.pw||"1")!==pw){ setErr("비밀번호가 일치하지 않아요."); return; }
+    onLogin(u.id);
+  };
+  return (
+    <div className="login"><div className="login-card">
+      <div className="brand center"><span className="brand-mark big">팀 근태 관리</span><span className="brand-sub">로그인</span></div>
+      <p className="login-hint">이름과 비밀번호로 로그인하세요. (임시 비밀번호: 1)</p>
+      <div className="sideform">
+        <Field label="이름"><input className="input" value={name} onChange={e=>{setName(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="이름" /></Field>
+        <Field label="비밀번호"><input className="input" type="password" value={pw} onChange={e=>{setPw(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="비밀번호" /></Field>
+      </div>
+      {err&&<p className="login-err">{err}</p>}
+      <button className="btn primary fullw mt" onClick={submit}>로그인</button>
+    </div></div>
+  );
+}
+
+function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,myBlocks,persist,flash,onAddOvertime,onAddLate,onResolveLate,onResolveEarly,onMarkLinkDay,onDecide,openMail,onManage,onLogout,onProfile,onGwSync}){
+  const now=new Date();
+  const [view,setView]=useState({y:now.getFullYear(),m:now.getMonth()});
+  const [sel,setSel]=useState(null);
+  const [syncOpen,setSyncOpen]=useState(false);
+  const [report,setReport]=useState(null);
+  const [blockMember,setBlockMember]=useState("all");
+  const [blockSort,setBlockSort]=useState("date");
+  const isMaster=meUser.role==="master";
+  const first=new Date(view.y,view.m,1), startDow=first.getDay(), daysIn=new Date(view.y,view.m+1,0).getDate();
+  const cells=[]; for(let i=0;i<startDow;i++)cells.push(null); for(let d=1;d<=daysIn;d++)cells.push(d); while(cells.length%7)cells.push(null);
+  const dayKey=(d)=>view.y+"-"+String(view.m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+  const eventsFor=(ds)=>{
+    const evs=[];
+    data.late.filter(l=>visibleIds.includes(l.memberId)&&l.date===ds).forEach(l=>{
+      evs.push({ cls:l.resolvedUsageId?"ev-fixed":"ev-late", name:member(l.memberId)?.name||"", time:l.resolvedUsageId?"지각 해소":"지각 "+fmtDur(l.lateMinutes) });
+    });
+    (data.early||[]).filter(l=>visibleIds.includes(l.memberId)&&l.date===ds).forEach(l=>{
+      evs.push({ cls:(l.resolvedUsageId||l.linkDay)?"ev-fixed":"ev-early", name:member(l.memberId)?.name||"", time:l.linkDay?"링크데이":(l.resolvedUsageId?"조퇴 등록":"조퇴 "+fmtDur(l.earlyMinutes)) });
+    });
+    data.overtime.filter(o=>visibleIds.includes(o.requesterId)&&o.date===ds&&o.status==="completed").forEach(o=>{
+      const used=remainingOf(o.id)===0;
+      evs.push({ cls:used?"ev-otdone":"ev-otun", name:member(o.requesterId)?.name||"", time:used?"사용완료":fmtDur(o.totalMin) });
+    });
+    data.overtime.filter(o=>o.date===ds&&(isMaster?(o.status==="pending_pl"||o.status==="pending_lg"):((o.status==="pending_pl"&&o.plId===authId)||(o.status==="pending_lg"&&o.lgId===authId)))).forEach(o=>{
+      evs.push({ cls:"ev-pending", name:member(o.requesterId)?.name||"", time:"승인대기" });
+    });
+    data.usage.filter(u=>u.date===ds&&(isMaster?(u.status==="pending_pl"||u.status==="pending_lg"):((u.status==="pending_pl"&&u.plId===authId)||(u.status==="pending_lg"&&u.lgId===authId)))).forEach(u=>{
+      evs.push({ cls:"ev-pending", name:member(u.requesterId)?.name||"", time:u.type+" 대기" });
+    });
+    return evs;
+  };
+  const allBlocks=data.overtime.filter(o=>visibleIds.includes(o.requesterId)&&o.status==="completed").map(o=>{ const rem=remainingOf(o.id); const usedState=rem===0?"사용 완료":"미사용"; return {...o,rem,usedState}; });
+  // 추가근무 내역: 인원 필터 + 정렬(날짜/시간) + 잔여 시간
+  const canFilterBlocks=visibleIds.length>1;
+  const blockMemberOpts=visibleIds.map(id=>member(id)).filter(m=>m&&m.role!=="master").sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const filteredBlocks=(blockMember==="all"||!canFilterBlocks)?allBlocks:allBlocks.filter(b=>b.requesterId===blockMember);
+  const sortedBlocks=[...filteredBlocks].sort((a,b)=> blockSort==="time" ? (b.totalMin-a.totalMin)||(a.date<b.date?1:-1) : (a.date<b.date?1:a.date>b.date?-1:0));
+  const remainSum=filteredBlocks.reduce((s,b)=>s+(b.rem||0),0);
+  const move=(delta)=>{ let m=view.m+delta,y=view.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} setView({y,m}); };
+  const goToday=()=>setView({y:now.getFullYear(),m:now.getMonth()});
+
+  return (
+    <div className="cal-layout">
+      <section className="panel cal-main">
+        <div className="cal-bar">
+          <div className="cal-title"><button className="navbtn" onClick={()=>move(-1)}>‹</button><strong>{view.y}년 {view.m+1}월</strong><button className="navbtn" onClick={()=>move(1)}>›</button><button className="btn small ghost" onClick={goToday}>오늘</button></div>
+          <div className="rowbtns">
+            <button className="btn small primary" onClick={()=>setSyncOpen(true)}>그룹웨어 싱크</button>
+          </div>
+        </div>
+        <p className="scope">표시 범위: <strong>{scopeLabel}</strong></p>
+        <div className="legend"><span><i className="sw sw-late"></i>지각(미해소)</span><span><i className="sw sw-fixed"></i>지각/조퇴(해소)</span><span><i className="sw sw-early"></i>조퇴(미등록)</span><span><i className="sw sw-otun"></i>추가근무(미사용)</span><span><i className="sw sw-otdone"></i>추가근무(사용완료)</span><span><i className="sw sw-pending"></i>승인 대기</span></div>
+        <div className="cal-wdrow">
+          {WD.map((w,i)=><div key={w} className={"cal-wd"+(i===0?" sun":i===6?" sat":"")}>{w}</div>)}
+        </div>
+        <div className="cal-days">
+          {cells.map((d,i)=>{
+            if(!d) return <div key={i} className="cal-cell empty-cell"></div>;
+            const ds=dayKey(d), evs=eventsFor(ds), isToday=ds===today(), dow=(startDow+d-1)%7;
+            const shown=evs.slice(0,4);
+            return (<button key={i} className={"cal-cell"+(isToday?" today":"")+(sel===ds?" sel":"")} onClick={()=>setSel(ds)}>
+              <span className={"cal-num"+(dow===0?" sun":dow===6?" sat":"")}>{d}</span>
+              <span className="cal-events">
+                {shown.map((e,k)=>(<span key={k} className={"ev "+e.cls}><b>{e.name}</b> {e.time}</span>))}
+                {evs.length>shown.length&&<span className="ev-more">+{evs.length-shown.length}건</span>}
+              </span>
+            </button>);
+          })}
+        </div>
+      </section>
+
+      <aside className="cal-side">
+        <section className="panel side-panel loginbox">
+          <div className="who-name">{meUser.name}<span className={"rolepill r-"+meUser.role}>{ROLE_LABEL[meUser.role]}</span></div>
+          {(meUser.dept||meUser.email||meUser.phone)&&<div className="dim" style={{fontSize:"12px",margin:"2px 0 4px",lineHeight:1.5}}>{meUser.dept||""}{meUser.email?<span><br/>{meUser.email}</span>:null}{meUser.phone?<span> · {meUser.phone}</span>:null}</div>}
+          <div className="who-actions">
+            {(meUser.role==="pl"||meUser.role==="lg"||meUser.role==="master")&&<button className="link" onClick={onManage}>팀원·프로젝트</button>}
+            <button className="link" onClick={onProfile}>정보변경</button>
+            <button className="link" onClick={onLogout}>로그아웃</button>
+          </div>
+        </section>
+        <section className="panel side-panel" style={{padding:"12px 14px"}}>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("plan")}>계획 보고</button>
+            <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("result")}>결과 보고</button>
+          </div>
+        </section>
+        <section className="panel side-panel side-blocks">
+          <div className="panel-head" style={{marginBottom:8}}><h2 className="panel-title" style={{fontSize:"15px"}}>추가근무 내역</h2><span className="dim">{filteredBlocks.length}건</span></div>
+          {canFilterBlocks&&(
+            <select className="input mini" style={{width:"100%",marginBottom:8}} value={blockMember} onChange={e=>setBlockMember(e.target.value)}>
+              <option value="all">전체 인원</option>
+              {blockMemberOpts.map(m=><option key={m.id} value={m.id}>{m.name}{m.dept?(" · "+m.dept):""}</option>)}
+            </select>
+          )}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <span className="dim" style={{fontSize:"12.5px"}}>잔여 <strong className="big-balance sm" style={{fontSize:"16px"}}>{fmtDur(remainSum)}</strong></span>
+            <div className="rowbtns">
+              <button className={"btn small "+(blockSort==="date"?"primary":"ghost")} onClick={()=>setBlockSort("date")}>날짜순</button>
+              <button className={"btn small "+(blockSort==="time"?"primary":"ghost")} onClick={()=>setBlockSort("time")}>시간순</button>
+            </div>
+          </div>
+          {sortedBlocks.length===0?<Empty>적립된 추가근무가 없어요.</Empty>:(
+            <ul className="list side-blocks-list">
+              {sortedBlocks.map(b=>(
+                <li key={b.id} className="item" style={{padding:"9px 2px"}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0}}>
+                    <strong style={{fontSize:"13px"}}>{b.date}{visibleIds.length>1?<span className="dim" style={{fontWeight:400}}> · {member(b.requesterId)?.name}</span>:null}</strong>
+                    <span className="dim" style={{fontSize:"11.5px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(data.projects.find(p=>p.id===b.projectId)?.name)?(data.projects.find(p=>p.id===b.projectId).name+" · "):""}{b.reason}</span>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+                    <strong className="num" style={{fontSize:"13px"}}>{fmtDur(b.totalMin)}</strong>
+                    <span className={"chip "+(b.usedState==="사용 완료"?"s-done":"s-ot")} style={{fontSize:"10px",padding:"1px 7px"}}>{b.usedState}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </aside>
+
+      {sel&&<DayDetail ds={sel} data={data} authId={authId} meUser={meUser} visibleIds={visibleIds} member={member} remainingOf={remainingOf} myBlocks={myBlocks} onClose={()=>setSel(null)} onResolveLate={onResolveLate} onResolveEarly={onResolveEarly} onMarkLinkDay={onMarkLinkDay} onDecide={onDecide} />}
+      {syncOpen&&<SyncModal meUser={meUser} onGwSync={onGwSync} onProfile={onProfile} onClose={()=>setSyncOpen(false)} />}
+      {report&&<ReportModal kind={report} data={data} authId={authId} meUser={meUser} member={member} persist={persist} flash={flash} openMail={openMail} onClose={()=>setReport(null)} />}
+    </div>
+  );
+}
+
+function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onClose}){
+  const canMng=meUser.role==="master"||meUser.role==="lg"||meUser.role==="partlead";
+  const reportable=canMng?data.projects:data.projects.filter(p=>p.plId===authId||(p.memberIds||[]).includes(authId));
+  const [projectId,setProjectId]=useState(reportable[0]?.id||"");
+  const [date,setDate]=useState(today());
+  const [to,setTo]=useState(REPORT_TO_DEFAULT);
+  const [cc,setCc]=useState(REPORT_CC_DEFAULT);
+  const [reasons,setReasons]=useState({});
+  const [initReasons,setInitReasons]=useState({}); // 불러온 원본(변경 감지용)
+  const proj=data.projects.find(p=>p.id===projectId)||null;
+  useEffect(()=>{
+    const map={};
+    (data.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{ map[x.memberId]=x.reason; });
+    setReasons(map); setInitReasons(map);
+    const p=data.projects.find(x=>x.id===projectId);
+    setTo(p&&p.reportTo?p.reportTo:REPORT_TO_DEFAULT);
+    setCc(p&&p.reportCc?p.reportCc:REPORT_CC_DEFAULT);
+  },[projectId,date]);
+  const canEditRow=(mid)=> canMng || (proj&&proj.plId===authId) || mid===authId;
+  const rows=(proj?.memberIds||[]).map(mid=>{
+    const m=member(mid);
+    const blk=data.overtime.find(o=>o.requesterId===mid&&o.date===date&&o.status==="completed");
+    return { memberId:mid, name:m?.name||"(삭제됨)", canEdit:canEditRow(mid), leave: blk?(blk.end||""):"" };
+  });
+  // 저장 직전 서버 최신본을 받아 '본인이 편집한 행'만 덮어써서 병합 → 동시 작성 충돌(덮어쓰기) 방지
+  const persistData=async()=>{
+    let latest=data;
+    try{ const r=await fetch(DATA_API,{cache:"no-store"}); const j=await r.json(); if(j&&j.ok&&j.data) latest=j.data; }catch(e){}
+    let reps=[...(latest.otReports||[])];
+    rows.forEach(r=>{ if(!r.canEdit)return;
+      const reason=(reasons[r.memberId]||"").trim();
+      if(reason===(initReasons[r.memberId]||"").trim()) return; // 내가 바꾸지 않은 행은 건드리지 않음(남의 사유 보존)
+      const idx=reps.findIndex(x=>x.projectId===projectId&&x.date===date&&x.memberId===r.memberId);
+      if(idx>=0) reps[idx]={...reps[idx],reason}; else if(reason) reps.push({projectId,date,memberId:r.memberId,reason}); });
+    const projects=(latest.projects||[]).map(p=>p.id===projectId?{...p,reportTo:to,reportCc:cc}:p);
+    const next={...latest,otReports:reps,projects};
+    persist(next);
+    return next;
+  };
+  const onSave=async()=>{ if(!proj)return; const merged=await persistData();
+    const map={}; (merged.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{map[x.memberId]=x.reason;}); setReasons(map); setInitReasons(map);
+    flash("보고 사유를 저장했어요."); };
+  const onGen=async()=>{
+    if(!proj)return alert("프로젝트를 선택해 주세요.");
+    if((proj.memberIds||[]).length===0)return alert("이 프로젝트에 소속 팀원이 없어요. 팀원·프로젝트 관리에서 추가해 주세요.");
+    const merged=await persistData();
+    const map={}; (merged.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{map[x.memberId]=x.reason;});
+    const mail=buildReportMail({kind,project:proj,date,to,cc,reporter:meUser,rows:rows.map(r=>({name:r.name,reason:map[r.memberId]||reasons[r.memberId]||"",leave:r.leave}))});
+    openMail(mail); onClose();
+  };
+  const kindLabel=kind==="result"?"결과":"계획";
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal wide" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>연장 근무 {kindLabel} 보고</h3><button className="x" onClick={onClose}>✕</button></div>
+        {reportable.length===0?<Empty>보고할 수 있는 소속 프로젝트가 없어요. 팀원·프로젝트 관리에서 프로젝트에 배정되어야 합니다.</Empty>:(
+        <React.Fragment>
+        <div className="form">
+          <Field label="프로젝트"><select className="input" value={projectId} onChange={e=>setProjectId(e.target.value)}>{reportable.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label="일자"><input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)} /></Field>
+          <Field label="받는 사람"><input className="input" value={to} onChange={e=>setTo(e.target.value)} placeholder="받는 사람" /></Field>
+          <Field label="참조"><input className="input" value={cc} onChange={e=>setCc(e.target.value)} placeholder="참조" /></Field>
+        </div>
+        <p className="panel-sub" style={{margin:"10px 0 0"}}>담당자별 연장근무 사유 {canMng?"(전체 편집 가능)":"(본인 행만 편집)"} · 제목: <strong>[보고] {proj?.name} 프로젝트 연장 근무 {kindLabel} 보고 ({String(date).replace(/-/g,"/")})</strong></p>
+        <div className="tablewrap">
+          <table className="reptable">
+            <thead><tr><th>담당자</th><th>연장근무 사유</th>{kind==="result"&&<th style={{width:80}}>퇴근 시간</th>}</tr></thead>
+            <tbody>
+              {rows.length===0?<tr><td className="c" colSpan={kind==="result"?3:2}><span className="dim">소속 팀원이 없어요.</span></td></tr>:rows.map(r=>(
+                <tr key={r.memberId}>
+                  <td className="c" style={{whiteSpace:"nowrap"}}>{r.name}{r.memberId===authId?<span className="dim"> (나)</span>:null}</td>
+                  <td>{r.canEdit?<textarea value={reasons[r.memberId]||""} onChange={e=>setReasons({...reasons,[r.memberId]:e.target.value})} placeholder="연장근무 사유 (줄바꿈 가능)" />:<span style={{whiteSpace:"pre-wrap"}} className="dim">{reasons[r.memberId]||"—"}</span>}</td>
+                  {kind==="result"&&<td className="c">{r.leave||"—"}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유는 각자 본인 행을 저장하면 공유 취합됩니다. {kind==="result"&&"퇴근 시간은 싱크된 추가근무에서 자동 표시됩니다."}</p>
+        <div className="actions"><button className="btn primary" onClick={onGen}>메일 초안 생성</button><button className="btn ghost" onClick={onSave}>사유 저장</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
+        </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SyncModal({meUser,onGwSync,onProfile,onClose}){
+  const MONTHS=recentMonths(6);
+  const [gwId,setGwId]=useState("");
+  const [gwPw,setGwPw]=useState("");
+  const [api,setApi]=useState(DEFAULT_GW_API);
+  const [picked,setPicked]=useState([MONTHS[0]]);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const [result,setResult]=useState(null);
+  const [showAdv,setShowAdv]=useState(false);
+  useEffect(()=>{ (async()=>{ const c=await gwCredGet(meUser.id); setGwId(c.gwId||""); setGwPw(c.gwPw||""); setApi(await gwApiGet()); })(); },[meUser.id]);
+  const toggle=(m)=>setPicked(p=>p.includes(m)?p.filter(x=>x!==m):[...p,m]);
+  const run=async()=>{
+    setErr(""); setResult(null);
+    if(!gwId||!gwPw){ setErr("‘정보변경’에서 그룹웨어 ID/PW를 먼저 입력해 주세요."); return; }
+    if(picked.length===0){ setErr("싱크할 월을 1개 이상 선택해 주세요."); return; }
+    setBusy(true);
+    try{
+      await gwApiSet(api);
+      const months=[...picked].sort();
+      const res=await fetch(api.replace(/\/+$/,"")+"/api/groupware/attendance",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({id:gwId,pw:gwPw,months})
+      });
+      const j=await res.json().catch(()=>null);
+      if(!res.ok||!j||!j.ok){ setErr((j&&j.error)||("요청 실패 ("+res.status+")")); setBusy(false); return; }
+      const allDays=months.flatMap(m=>j.months[m]||[]);
+      const summary=onGwSync(allDays);
+      setResult(summary);
+    }catch(e){
+      setErr("백엔드 서버에 연결할 수 없습니다. backend 폴더에서 npm install 후 npm start 하고 다시 시도해 주세요. ("+e.message+")");
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>그룹웨어 근태 싱크</h3><button className="x" onClick={onClose}>✕</button></div>
+        <p className="dim mb">그룹웨어(nhr) 근태를 가져와 <strong>지각</strong>·<strong>조퇴</strong>·<strong>초과근무</strong>를 자동 등록합니다. (조퇴는 사용한 추가근무를 ‘일자 상세’에서 등록 가능 · 기준 08:30~17:30, 반차 자동 반영)</p>
+        {(!gwId||!gwPw)&&(
+          <div className="warnline" style={{marginTop:0}}>그룹웨어 ID/PW가 저장되어 있지 않아요. <button className="link" onClick={()=>{onClose();onProfile();}}>정보변경에서 입력하기</button></div>
+        )}
+        <div className="approver-info" style={{marginTop:12}}>연동 계정 <strong>{gwId||"(미설정)"}</strong> · 대상 <strong>{meUser.name}</strong></div>
+        <Field label="싱크할 월 (여러 개 선택 가능)" full>
+          <div className="chips-pick">
+            {MONTHS.map(m=>(<button key={m} className={"mchip"+(picked.includes(m)?" on":"")} onClick={()=>toggle(m)}>{m}</button>))}
+          </div>
+        </Field>
+        <p className="dim" style={{margin:"8px 0 0"}}><button className="link" onClick={()=>setShowAdv(v=>!v)}>{showAdv?"▾":"▸"} 서버 주소 설정</button></p>
+        {showAdv&&<Field label="백엔드 서버 주소" full><input className="input" value={api} onChange={e=>setApi(e.target.value)} placeholder={DEFAULT_GW_API} /></Field>}
+        {err&&<p className="login-err" style={{textAlign:"left"}}>{err}</p>}
+        {result&&(
+          <div className="day-sec" style={{marginTop:14}}>
+            <h4>싱크 결과 — 지각 {result.addedLate} · 조퇴 {result.addedEarly||0} · 초과근무 {result.addedOt}{result.dup?(" · 중복 건너뜀 "+result.dup):""}</h4>
+            {!result.hasProject&&result.addedOt>0&&<p className="warnline" style={{marginTop:0}}>소속 프로젝트가 없어 초과근무 블록의 승인자(PL·스탭)가 비어 있어요. 사용하려면 팀원·프로젝트 관리에서 프로젝트를 배정하세요.</p>}
+            {result.items.length===0?<p className="dim">새로 등록할 지각/초과근무가 없어요.</p>:(
+              <div className="resolve-list" style={{flexDirection:"column",alignItems:"stretch",gap:4}}>
+                {result.items.map((it,i)=>(<div key={i} className="day-row" style={{padding:"4px 0"}}><div><span className="tag">{it.type}</span> <strong>{it.date}</strong> · {fmtDur(it.min)}{it.event?<span className="dim"> · {it.event}</span>:null}</div></div>))}
+              </div>
+            )}
+          </div>
+        )}
+        <div className="actions">
+          {result?<button className="btn primary" onClick={onClose}>닫기</button>:(
+            <React.Fragment>
+              <button className="btn primary" onClick={run} disabled={busy}>{busy?"가져오는 중…":"싱크 실행"}</button>
+              <button className="btn ghost" onClick={onClose} disabled={busy}>취소</button>
+            </React.Fragment>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayDetail({ds,data,authId,meUser,visibleIds,member,remainingOf,myBlocks,onClose,onResolveLate,onResolveEarly,onMarkLinkDay,onDecide}){
+  const proj=(id)=>data.projects.find(p=>p.id===id);
+  const lates=data.late.filter(l=>visibleIds.includes(l.memberId)&&l.date===ds);
+  const earlies=(data.early||[]).filter(l=>visibleIds.includes(l.memberId)&&l.date===ds);
+  const ots=data.overtime.filter(o=>visibleIds.includes(o.requesterId)&&o.date===ds&&o.status==="completed");
+  const uses=data.usage.filter(u=>visibleIds.includes(u.requesterId)&&u.date===ds&&u.status!=="rejected");
+  const myOts=data.overtime.filter(o=>o.requesterId===authId&&o.date===ds&&o.status!=="completed"&&o.status!=="rejected");
+  const isMaster=meUser.role==="master";
+  const pendItems=[
+    ...data.overtime.filter(o=>o.date===ds&&(isMaster?(o.status==="pending_pl"||o.status==="pending_lg"):((o.status==="pending_pl"&&o.plId===authId)||(o.status==="pending_lg"&&o.lgId===authId)))).map(o=>({...o,kind:"ot"})),
+    ...data.usage.filter(u=>u.date===ds&&(isMaster?(u.status==="pending_pl"||u.status==="pending_lg"):((u.status==="pending_pl"&&u.plId===authId)||(u.status==="pending_lg"&&u.lgId===authId)))).map(u=>({...u,kind:"use"})),
+  ];
+  const [resolveFor,setResolveFor]=useState(null);
+  const [resolveEarlyFor,setResolveEarlyFor]=useState(null);
+  const unused=myBlocks.filter(b=>b.remaining===b.totalMin);
+  const candidatesFor=(needMin)=>unused.filter(b=>b.totalMin>=needMin).sort((a,b)=>a.totalMin-b.totalMin);
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>{ds} ({WD[new Date(ds).getDay()]})</h3><button className="x" onClick={onClose}>✕</button></div>
+        {pendItems.length>0&&(
+          <div className="day-sec"><h4>승인 대기 — 내가 처리</h4>
+            {pendItems.map(r=>(
+              <div key={r.id} className="day-row">
+                <div><span className="tag">{r.kind==="ot"?"추가근무":r.type}</span> <strong>{member(r.requesterId)?.name}</strong><span className="dim"> · {r.kind==="ot"?(proj(r.projectId)?.name):fmtDur(r.minutes)} · {r.reason}</span> <span className="dim">({r.status==="pending_pl"?"1차":"2차"})</span></div>
+                <div className="rowbtns"><button className="btn small primary" onClick={()=>onDecide(r.kind,r.id,true)}>승인</button><button className="btn small danger" onClick={()=>onDecide(r.kind,r.id,false)}>반려</button></div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="day-sec"><h4>지각</h4>
+          {lates.length===0?<p className="dim">없음</p>:lates.map(l=>(
+            <div key={l.id} className="day-row">
+              <div><strong>{member(l.memberId)?.name}</strong> · {fmtDur(l.lateMinutes)} 지각<span className="dim"> · {l.reason}</span></div>
+              {l.resolvedUsageId?<span className="chip s-ok">추가근무로 해소</span>:l.memberId===authId?(
+                resolveFor===l.id?(
+                  <div className="resolve"><span className="dim">상계할 블록(길이 ≥ {fmtDur(l.lateMinutes)}, 통째 소진)</span>
+                    <div className="resolve-list">
+                      {candidatesFor(l.lateMinutes).length===0&&<span className="dim">충분한 블록이 없어요</span>}
+                      {candidatesFor(l.lateMinutes).map((b,bi)=>(<button key={b.id} className={"btn small "+(bi===0?"primary":"ghost")} onClick={()=>{onResolveLate(l.id,b.id);setResolveFor(null);}}>{b.date} · {fmtDur(b.totalMin)}{bi===0?" · 추천":""}</button>))}
+                    </div>
+                  </div>
+                ):<button className="btn small primary" onClick={()=>setResolveFor(l.id)}>추가근무로 해소</button>
+              ):<span className="chip s-no">미해소</span>}
+            </div>
+          ))}
+        </div>
+        <div className="day-sec"><h4>조퇴</h4>
+          {earlies.length===0?<p className="dim">없음</p>:earlies.map(l=>(
+            <div key={l.id} className="day-row">
+              <div><strong>{member(l.memberId)?.name}</strong> · {fmtDur(l.earlyMinutes)} 조퇴<span className="dim"> · {l.reason}</span></div>
+              {l.linkDay?<span className="chip s-ok">링크데이 참석</span>:l.resolvedUsageId?<span className="chip s-ok">추가근무로 등록</span>:l.memberId===authId?(
+                resolveEarlyFor===l.id?(
+                  <div className="resolve"><span className="dim">사용할 추가근무 블록(길이 ≥ {fmtDur(l.earlyMinutes)}, 통째 소진) · 또는 회사 행사면 링크데이로 등록</span>
+                    <div className="resolve-list">
+                      {candidatesFor(l.earlyMinutes).length===0&&<span className="dim">충분한 블록이 없어요</span>}
+                      {candidatesFor(l.earlyMinutes).map((b,bi)=>(<button key={b.id} className={"btn small "+(bi===0?"primary":"ghost")} onClick={()=>{onResolveEarly(l.id,b.id);setResolveEarlyFor(null);}}>{b.date} · {fmtDur(b.totalMin)}{bi===0?" · 추천":""}</button>))}
+                      <button className="btn small ghost" onClick={()=>{onMarkLinkDay(l.id);setResolveEarlyFor(null);}}>링크데이 참석 (상계 없이)</button>
+                    </div>
+                  </div>
+                ):<button className="btn small primary" onClick={()=>setResolveEarlyFor(l.id)}>사용한 추가근무 등록</button>
+              ):<span className="chip s-no">미등록</span>}
+            </div>
+          ))}
+        </div>
+        {myOts.length>0&&(
+          <div className="day-sec"><h4>내 추가근무 진행</h4>
+            {myOts.map(o=>(
+              <div key={o.id} className="day-row"><div><strong>{proj(o.projectId)?.name}</strong><span className="dim"> · {o.start}~{o.end} · {fmtDur(o.totalMin)} · {o.reason}</span></div><Chip status={o.status} /></div>
+            ))}
+          </div>
+        )}
+        <div className="day-sec"><h4>추가근무 (적립)</h4>
+          {ots.length===0?<p className="dim">없음</p>:ots.map(o=>{ const rem=remainingOf(o.id);
+            return (<div key={o.id} className="day-row"><div><strong>{member(o.requesterId)?.name}</strong> · {fmtDur(o.totalMin)}<span className="dim"> · {proj(o.projectId)?.name} · {o.reason}</span></div><span className={"chip "+(rem===0?"s-done":"s-ot")}>{rem===0?"사용 완료":"미사용"}</span></div>); })}
+        </div>
+        <div className="day-sec"><h4>시간 사용</h4>
+          {uses.length===0?<p className="dim">없음</p>:uses.map(u=>(<div key={u.id} className="day-row"><div><strong>{member(u.requesterId)?.name}</strong> · {u.type} {fmtDur(u.minutes)}</div><span className={"chip "+(STATUS[u.status]?.cls||"")}>{STATUS[u.status]?.label||u.status}</span></div>))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileModal({user,onSave,flash,onClose}){
+  const [name,setName]=useState(user.name);
+  const [dept,setDept]=useState(user.dept||""); const [email,setEmail]=useState(user.email||""); const [phone,setPhone]=useState(user.phone||""); const [title,setTitle]=useState(user.title||"");
+  const [cur,setCur]=useState(""); const [np,setNp]=useState(""); const [np2,setNp2]=useState("");
+  const [gwId,setGwId]=useState(""); const [gwPw,setGwPw]=useState("");
+  useEffect(()=>{ (async()=>{ const c=await gwCredGet(user.id); setGwId(c.gwId||""); setGwPw(c.gwPw||""); })(); },[user.id]);
+  const save=async()=>{
+    const patch={};
+    if(name.trim()&&name.trim()!==user.name) patch.name=name.trim();
+    if(dept!==(user.dept||"")) patch.dept=dept.trim();
+    if(email!==(user.email||"")) patch.email=email.trim();
+    if(phone!==(user.phone||"")) patch.phone=phone.trim();
+    if(title!==(user.title||"")) patch.title=title.trim();
+    if(cur||np||np2){
+      if((user.pw||"1")!==cur) return alert("현재 비밀번호가 일치하지 않아요.");
+      if(!np) return alert("새 비밀번호를 입력해 주세요.");
+      if(np!==np2) return alert("새 비밀번호 확인이 일치하지 않아요.");
+      patch.pw=np;
+    }
+    await gwCredSet(user.id,{gwId:gwId.trim(),gwPw:gwPw});
+    if(Object.keys(patch).length>0) onSave(patch);
+    flash("정보를 변경했어요."); onClose();
+  };
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>정보 변경</h3><button className="x" onClick={onClose}>✕</button></div>
+        <div className="form">
+          <Field label="이름"><input className="input" value={name} onChange={e=>setName(e.target.value)} /></Field>
+          <Field label="직위 (보고 인사말용)"><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="예: 연구원 / 프로" /></Field>
+          <Field label="부서명"><input className="input" value={dept} onChange={e=>setDept(e.target.value)} placeholder="부서명" /></Field>
+          <Field label="메일주소"><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@linkgenesis.co.kr" autoComplete="off" /></Field>
+          <Field label="휴대전화"><input className="input" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" autoComplete="off" /></Field>
+        </div>
+        <p className="panel-sub mb">비밀번호 변경 (선택)</p>
+        <div className="form">
+          <Field label="현재 비밀번호"><input className="input" type="password" value={cur} onChange={e=>setCur(e.target.value)} /></Field>
+          <Field label="새 비밀번호"><input className="input" type="password" value={np} onChange={e=>setNp(e.target.value)} /></Field>
+          <Field label="새 비밀번호 확인" full><input className="input" type="password" value={np2} onChange={e=>setNp2(e.target.value)} /></Field>
+        </div>
+        <p className="panel-sub mb">그룹웨어 연동 <span className="dim">(이 기기에만 저장 · 근태 싱크에 사용)</span></p>
+        <div className="form">
+          <Field label="그룹웨어 로그인 ID"><input className="input" value={gwId} onChange={e=>setGwId(e.target.value)} placeholder="그룹웨어 아이디" autoComplete="off" /></Field>
+          <Field label="그룹웨어 PW"><input className="input" type="password" value={gwPw} onChange={e=>setGwPw(e.target.value)} placeholder="그룹웨어 비밀번호" autoComplete="new-password" /></Field>
+        </div>
+        <div className="actions"><button className="btn primary" onClick={save}>저장</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
+      </div>
+    </div>
+  );
+}
+
+function OvertimeCard({o,member,proj,onLog,openMail}){
+  const [start,setStart]=useState(o.start||"17:30"); const [end,setEnd]=useState(o.end||""); const preview=calcOvertime(start,end);
+  return (
+    <div className="reccard">
+      <div className="reccard-top"><div><strong>{proj(o.projectId)?.name||"-"}</strong><span className="dim"> · {o.date}</span></div><Chip status={o.status} /></div>
+      <p className="reccard-reason">{o.reason}</p>
+      <div className="reccard-meta"><span>PL {member(o.plId)?.name||"-"}</span><span>스탭 {member(o.lgId)?.name||"-"}</span>{o.status==="completed"&&<span className="amt">{fmtDur(o.totalMin)} 적립</span>}</div>
+      {o.status==="approved"&&(
+        <div className="logbox"><p className="logbox-hint">근무 후 시작·종료 시각을 기록하세요. 17:30 이후만 인정됩니다.</p>
+          <div className="time-row"><input className="input" type="time" value={start} onChange={e=>setStart(e.target.value)} /><span className="arrow">→</span><input className="input" type="time" value={end} onChange={e=>setEnd(e.target.value)} /><span className="preview">{preview>0?fmtDur(preview):"—"}</span></div>
+          <div className="actions"><button className="btn small ghost" onClick={()=>openMail(mailStart({...o,start},proj))}>시작 메일</button><button className="btn small ghost" onClick={()=>openMail(mailEnd({...o,start,end,totalMin:preview},proj))}>종료 메일</button><button className="btn small primary" onClick={()=>onLog(o.id,start,end)}>적립 확정</button></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function Approvals({items,member,project,onDecide}){
+  if(items.length===0) return <div className="panel"><h2 className="panel-title">승인함</h2><Empty>처리할 승인 요청이 없어요.</Empty></div>;
+  return (
+    <div className="panel"><h2 className="panel-title">승인함</h2><p className="panel-sub">현재 사용자가 처리할 요청만 보입니다.</p>
+      <div className="cards">{items.map(r=>(
+        <div key={r.id} className="reccard">
+          <div className="reccard-top"><div><span className="tag">{r.kind==="ot"?"추가근무":r.type}</span><strong> {member(r.requesterId)?.name}</strong><span className="dim"> · {r.date}</span></div><Chip status={r.status} /></div>
+          <p className="reccard-reason">{r.reason}</p>
+          <div className="reccard-meta">{r.kind==="ot"?<span>프로젝트 {project(r.projectId)?.name||"-"}</span>:<span>{fmtDur(r.minutes)} 사용</span>}<span>{r.status==="pending_pl"?"1차(PL)":"2차(스탭)"}</span></div>
+          <div className="actions"><button className="btn small primary" onClick={()=>onDecide(r.kind,r.id,true)}>승인</button><button className="btn small danger" onClick={()=>onDecide(r.kind,r.id,false)}>반려</button></div>
+        </div>
+      ))}</div>
+    </div>
+  );
+}
+
+function Manage({data,persist,flash}){
+  const [mq,setMq]=useState(""); const [mpage,setMpage]=useState(1); const PER=10;
+  const [pname,setPname]=useState(""); const [ppl,setPpl]=useState(""); const [plg,setPlg]=useState("");
+  const [memberModal,setMemberModal]=useState(null); // "add" | memberObj
+  const [projPicker,setProjPicker]=useState(null);    // projectId
+  const q=mq.trim().toLowerCase();
+  const sortedMembers=[...data.members].sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const filteredMembers=q?sortedMembers.filter(m=>(m.name||"").toLowerCase().includes(q)||(m.dept||"").toLowerCase().includes(q)||(m.email||"").toLowerCase().includes(q)||(m.phone||"").toLowerCase().includes(q)||(ROLE_LABEL[m.role]||"").toLowerCase().includes(q)):sortedMembers;
+  const pageCount=Math.max(1,Math.ceil(filteredMembers.length/PER));
+  const curPage=Math.min(mpage,pageCount);
+  const pageMembers=filteredMembers.slice((curPage-1)*PER,curPage*PER);
+  const saveMember=(form,id)=>{
+    if(id){ persist({...data,members:data.members.map(m=>m.id===id?{...m,...form}:m)}); flash("정보를 수정했어요."); }
+    else { persist({...data,members:[...data.members,{id:uid(),pw:"1",...form}]}); flash("인원을 추가했어요."); }
+    setMemberModal(null);
+  };
+  const removeMember=(id)=>{ if(confirm("삭제할까요?"))persist({...data,members:data.members.filter(m=>m.id!==id),projects:data.projects.map(p=>({...p,memberIds:p.memberIds.filter(x=>x!==id)}))}); };
+  const pls=data.members.filter(m=>m.role==="pl"); const lgs=data.members.filter(m=>m.role==="lg");
+  const addProject=()=>{ if(!pname.trim())return; persist({...data,projects:[...data.projects,{id:uid(),name:pname.trim(),plId:ppl||pls[0]?.id||"",lgId:plg||lgs[0]?.id||"",memberIds:[]}]}); setPname(""); flash("프로젝트를 추가했어요."); };
+  const toggleM=(pid,mid)=>persist({...data,projects:data.projects.map(p=>p.id===pid?{...p,memberIds:p.memberIds.includes(mid)?p.memberIds.filter(x=>x!==mid):[...p.memberIds,mid]}:p)});
+  const setPl=(pid,plId)=>persist({...data,projects:data.projects.map(p=>p.id===pid?{...p,plId}:p)});
+  const setLg=(pid,lgId)=>persist({...data,projects:data.projects.map(p=>p.id===pid?{...p,lgId}:p)});
+  const removeProject=(pid)=>{ if(confirm("프로젝트를 삭제할까요?"))persist({...data,projects:data.projects.filter(p=>p.id!==pid)}); };
+  const pickProj=projPicker?data.projects.find(p=>p.id===projPicker):null;
+  return (
+    <div className="stack">
+      <section className="panel"><div className="panel-head"><h2 className="panel-title">팀원 {data.members.length}명</h2><button className="btn small primary" onClick={()=>setMemberModal("add")}>＋ 인원추가</button></div>
+        <input className="input searchbox" value={mq} onChange={e=>{setMq(e.target.value);setMpage(1);}} placeholder="이름·부서·직책·메일·전화 검색" />
+        {filteredMembers.length===0?<Empty>검색 결과가 없어요.</Empty>:(
+          <ul className="list">{pageMembers.map(m=>(<li key={m.id} className="item"><div className="item-main"><span className="avatar">{m.name.slice(0,1)}</span><div style={{display:"flex",flexDirection:"column",lineHeight:1.35}}><strong>{m.name}{m.dept?<span className="dim" style={{fontWeight:400}}> · {m.dept}</span>:null}</strong>{(m.email||m.phone)&&<span className="dim" style={{fontSize:"11.5px"}}>{m.email||""}{m.email&&m.phone?" · ":""}{m.phone||""}</span>}</div></div><div className="item-main" style={{gap:6}}><span className={"rolepill r-"+m.role}>{ROLE_LABEL[m.role]||m.role}</span>{m.role!=="master"&&<button className="btn small ghost" onClick={()=>setMemberModal(m)}>수정</button>}{m.role!=="master"&&<button className="x" onClick={()=>removeMember(m.id)}>✕</button>}</div></li>))}</ul>
+        )}
+        {filteredMembers.length>0&&(
+          <React.Fragment>
+            <div className="pager">
+              <button className="btn small ghost" disabled={curPage<=1} onClick={()=>setMpage(curPage-1)}>‹</button>
+              {Array.from({length:pageCount},(_,i)=>i+1).map(n=>(<button key={n} className={"btn small "+(n===curPage?"primary":"ghost")} onClick={()=>setMpage(n)}>{n}</button>))}
+              <button className="btn small ghost" disabled={curPage>=pageCount} onClick={()=>setMpage(curPage+1)}>›</button>
+            </div>
+            <p className="dim" style={{textAlign:"center",margin:"8px 0 0"}}>총 {filteredMembers.length}명 · {curPage}/{pageCount} 페이지</p>
+          </React.Fragment>
+        )}
+      </section>
+      <section className="panel"><h2 className="panel-title">프로젝트</h2><p className="panel-sub">여기서 지정한 PL(1차)·스탭(2차)이 추가근무·시간사용 승인자로 자동 적용됩니다.</p>
+        <div className="form"><Field label="프로젝트명"><input className="input" value={pname} onChange={e=>setPname(e.target.value)} placeholder="프로젝트명" /></Field><Field label="PL (1차)"><select className="input" value={ppl} onChange={e=>setPpl(e.target.value)}><option value="">선택</option>{pls.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></Field><Field label="스탭 (2차)"><select className="input" value={plg} onChange={e=>setPlg(e.target.value)}><option value="">선택</option>{lgs.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></Field></div>
+        <div className="actions"><button className="btn primary" onClick={addProject}>프로젝트 추가</button></div>
+        <div className="cards mt">{data.projects.map(p=>(
+          <div key={p.id} className="reccard"><div className="reccard-top"><strong>{p.name}</strong><button className="x" onClick={()=>removeProject(p.id)}>✕</button></div>
+            <div className="proj-pl"><span className="flabel">PL (1차)</span><select className="input mini" value={p.plId} onChange={e=>setPl(p.id,e.target.value)}>{pls.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select><span className="flabel">스탭 (2차)</span><select className="input mini" value={p.lgId||""} onChange={e=>setLg(p.id,e.target.value)}><option value="">선택</option>{lgs.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+            <span className="flabel">소속 팀원 ({(p.memberIds||[]).length})</span>
+            <div className="chips-pick">
+              {(p.memberIds||[]).length===0&&<span className="dim">아직 없음</span>}
+              {(p.memberIds||[]).map(id=>{ const m=data.members.find(x=>x.id===id); return m?(<span key={id} className="mchip on" style={{display:"inline-flex",alignItems:"center",gap:6}}>{m.name}<span onClick={()=>toggleM(p.id,id)} style={{cursor:"pointer"}}>✕</span></span>):null; })}
+              <button className="mchip" onClick={()=>setProjPicker(p.id)}>＋ 인원추가</button>
+            </div>
+          </div>
+        ))}</div>
+      </section>
+      {memberModal&&<MemberFormModal initial={memberModal==="add"?null:memberModal} onSave={(form)=>saveMember(form,memberModal==="add"?null:memberModal.id)} onClose={()=>setMemberModal(null)} />}
+      {pickProj&&<ProjMemberPicker project={pickProj} members={data.members} projects={data.projects} onToggle={(mid)=>toggleM(pickProj.id,mid)} onClose={()=>setProjPicker(null)} />}
+    </div>
+  );
+}
+
+function MemberFormModal({initial,onSave,onClose}){
+  const editing=!!initial;
+  const [name,setName]=useState(initial?.name||"");
+  const [role,setRole]=useState(initial?.role||"member");
+  const [dept,setDept]=useState(initial?.dept||"");
+  const [email,setEmail]=useState(initial?.email||"");
+  const [phone,setPhone]=useState(initial?.phone||"");
+  const save=()=>{ if(!name.trim())return alert("이름을 입력해 주세요."); onSave({name:name.trim(),role,dept:dept.trim(),email:email.trim(),phone:phone.trim()}); };
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>{editing?"인원 정보 수정":"인원 추가"}</h3><button className="x" onClick={onClose}>✕</button></div>
+        <div className="form">
+          <Field label="이름"><input className="input" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} placeholder="이름" /></Field>
+          <Field label="직책"><select className="input" value={role} onChange={e=>setRole(e.target.value)}><option value="member">팀원</option><option value="partlead">파트장</option><option value="pl">PL</option><option value="lg">스탭</option></select></Field>
+          <Field label="부서명"><input className="input" value={dept} onChange={e=>setDept(e.target.value)} placeholder="부서명" /></Field>
+          <Field label="휴대전화"><input className="input" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" /></Field>
+          <Field label="메일주소" full><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@linkgenesis.co.kr" autoComplete="off" /></Field>
+        </div>
+        <div className="actions"><button className="btn primary" onClick={save}>{editing?"저장":"추가"}</button><button className="btn ghost" onClick={onClose}>취소</button></div>
+      </div>
+    </div>
+  );
+}
+
+function ProjMemberPicker({project,members,projects,onToggle,onClose}){
+  const [q,setQ]=useState("");
+  const inOther=new Set();
+  projects.forEach(p=>{ if(p.id!==project.id)(p.memberIds||[]).forEach(id=>inOther.add(id)); });
+  // 후보: 팀원 직책 + 다른 프로젝트에 속하지 않은 인원 (이 프로젝트 소속은 포함)
+  const candidates=members.filter(m=>m.role==="member"&&!inOther.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const qq=q.trim().toLowerCase();
+  const list=qq?candidates.filter(m=>(m.name||"").toLowerCase().includes(qq)||(m.dept||"").toLowerCase().includes(qq)):candidates;
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <div className="modal-head"><h3>소속 인원 추가 — {project.name}</h3><button className="x" onClick={onClose}>✕</button></div>
+        <p className="dim mb">다른 프로젝트에 속하지 않은 팀원만 표시됩니다. 클릭해서 소속/해제하세요.</p>
+        <input className="input searchbox" value={q} onChange={e=>setQ(e.target.value)} placeholder="이름·부서 검색" />
+        {list.length===0?<Empty>추가할 수 있는 팀원이 없어요.</Empty>:(
+          <ul className="list" style={{maxHeight:"48vh",overflow:"auto"}}>
+            {list.map(m=>{ const on=(project.memberIds||[]).includes(m.id); return (
+              <li key={m.id} className="item" style={{cursor:"pointer"}} onClick={()=>onToggle(m.id)}>
+                <div className="item-main"><span className="avatar">{m.name.slice(0,1)}</span><div style={{display:"flex",flexDirection:"column",lineHeight:1.35}}><strong>{m.name}{m.dept?<span className="dim" style={{fontWeight:400}}> · {m.dept}</span>:null}</strong></div></div>
+                <span className={"chip "+(on?"s-ok":"s-done")}>{on?"✓ 소속":"추가"}</span>
+              </li>
+            ); })}
+          </ul>
+        )}
+        <div className="actions"><button className="btn primary" onClick={onClose}>완료</button></div>
+      </div>
+    </div>
+  );
+}
+
+function Field({label,children,full}){ return <label className={"field"+(full?" full":"")}><span className="flabel">{label}</span>{children}</label>; }
+function Chip({status}){ const s=STATUS[status]||{label:status,cls:""}; return <span className={"chip "+s.cls}>{s.label}</span>; }
+function Empty({children}){ return <div className="empty">{children}</div>; }
+function MailModal({modal,onClose,flash}){
+  const copy=async()=>{
+    try{
+      if(modal.html&&window.ClipboardItem){
+        const item=new ClipboardItem({"text/html":new Blob([modal.html],{type:"text/html"}),"text/plain":new Blob([modal.text||""],{type:"text/plain"})});
+        await navigator.clipboard.write([item]); flash("본문을 복사했어요 (서식 포함)."); return;
+      }
+      await navigator.clipboard.writeText(modal.text||""); flash("복사했어요.");
+    }catch(e){ try{ await navigator.clipboard.writeText(modal.text||""); flash("복사했어요."); }catch(e2){ flash("직접 선택해 복사해 주세요."); } }
+  };
+  return (<div className="backdrop" onClick={onClose}><div className={"modal"+(modal.html?" wide":"")} onClick={e=>e.stopPropagation()}>
+    <div className="modal-head"><h3>{modal.title}</h3><button className="x" onClick={onClose}>✕</button></div>
+    {(modal.to||modal.cc)&&<p className="dim mb" style={{userSelect:"text"}}>받는 사람: <strong>{modal.to}</strong>{modal.cc?<span> · 참조: <strong>{modal.cc}</strong></span>:null}</p>}
+    {modal.html?<div className="mailprev" dangerouslySetInnerHTML={{__html:modal.html}} />:<textarea className="mail" readOnly value={modal.text} />}
+    <div className="actions"><button className="btn primary" onClick={copy}>{modal.html?"본문 복사 (서식 포함)":"복사"}</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
+  </div></div>);
+}
+function mailRequest(f,member,proj){ const pl=member(f.plId)?.name||"PL",lg=member(f.lgId)?.name||"스탭",pn=proj(f.projectId)?.name||"(프로젝트)";
+  return {title:"추가근무 신청 메일",text:"받는 사람: "+lg+" (스탭)\n참조: "+pl+" (PL)\n제목: [추가근무 신청] "+f.date+" / "+pn+"\n\n안녕하세요.\n아래와 같이 추가근무를 신청합니다.\n\n- 일자: "+f.date+"\n- 프로젝트: "+pn+"\n- 사유: "+(f.reason||"(사유)")+"\n- PL 협의: "+pl+" (사전 협의 완료)\n\n검토 후 승인 부탁드립니다.\n감사합니다."}; }
+function mailStart(o,proj){ return {title:"추가근무 시작 메일",text:"제목: [추가근무 시작] "+o.date+" / "+(proj(o.projectId)?.name||"")+"\n\n추가근무를 시작합니다.\n- 시작 시각: "+(o.start||"(시각)")}; }
+function mailEnd(o,proj){ return {title:"추가근무 종료 메일",text:"제목: [추가근무 종료] "+o.date+" / "+(proj(o.projectId)?.name||"")+"\n\n추가근무를 종료합니다.\n- 시작: "+(o.start||"-")+"\n- 종료: "+(o.end||"-")+"\n- 인정 추가근무: "+fmtDur(o.totalMin)+" (17:30 이후 기준)"}; }
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

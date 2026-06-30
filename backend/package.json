@@ -1,0 +1,15 @@
+{
+  "name": "attendance-groupware-proxy",
+  "version": "1.0.0",
+  "description": "팀 근태 관리 서버. 웹 앱 서빙 + 공유 데이터 저장(data.json) + 그룹웨어 근태 싱크(헤드리스).",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "puppeteer": "^23.0.0"
+  }
+}

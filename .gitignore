@@ -1,0 +1,18 @@
+# 의존성
+node_modules/
+
+# 런타임 공유 데이터 (개인정보)
+backend/data.json
+backend/data.json.tmp
+
+# bkit 상태
+.bkit/
+
+# 개인정보 포함 엑셀 (인명록 / 근태 기록)
+*.xlsx
+
+# OS / 에디터
+Thumbs.db
+.DS_Store
+*.log
+npm-debug.log*
