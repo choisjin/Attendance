@@ -665,10 +665,10 @@ function Calendar({data,authId,meUser,visibleIds,scopeLabel,remainingOf,member,m
           </div>
         </section>
         <section className="panel side-panel" style={{padding:"12px 14px"}}>
-          <div style={{display:"flex",gap:8}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("plan")}>계획 보고</button>
             <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("result")}>결과 보고</button>
-            <button className="btn small ghost" style={{flex:1}} onClick={()=>setReport("adjust")}>근무조정 보고</button>
+            <button className="btn small ghost" style={{flex:"1 1 100%"}} onClick={()=>setReport("adjust")}>근무조정 보고</button>
           </div>
         </section>
         <section className="panel side-panel side-blocks">
