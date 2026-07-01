@@ -250,9 +250,12 @@ async function gwApiGet(){ const r=await sGetLocal("att2:gwapi"); return (r&&r.v
 async function gwApiSet(u){ await sSetLocal("att2:gwapi", (u||"").trim()||DEFAULT_GW_API); }
 // 최근 N개월 "YYYY-MM" 목록 (현재월 우선)
 function recentMonths(n){ const out=[]; const d=new Date(); d.setDate(1); for(let i=0;i<n;i++){ out.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); d.setMonth(d.getMonth()-1); } return out; }
-// 보고 메일 기본 수신자 (이미지 기준 · 프로젝트별로 덮어쓰기 가능)
-const REPORT_TO_DEFAULT="'최부경'; sw125.jung@lgepartner.com";
-const REPORT_CC_DEFAULT="Linkgenensis-autotest@lge.com";
+// 보고 메일 수신자/팀 (고정값) — 받는사람은 고정 이후 1인 추가 입력 가능
+const REPORT_TO_FIXED="bukyung.choi@lgepartner.com";        // 받는사람 고정
+const REPORT_CC_FIXED="Linkgenensis-autotest@lge.com";      // 참조 고정
+const REPORT_TEAM_TAG="자동화2팀";                            // 근무조정 보고 제목 머리(팀) 고정
+// 받는사람 = 고정 + (추가 1인)
+const reportTo=(extra)=>REPORT_TO_FIXED+((extra||"").trim()?("; "+extra.trim()):"");
 const escHtml=(s)=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 // 연장근무 계획/결과 보고 메일(HTML+텍스트) 생성
 function buildReportMail({kind,project,date,to,cc,reporter,rows}){
@@ -748,8 +751,7 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
   const reportable=canMng?data.projects:data.projects.filter(p=>p.plId===authId||(p.memberIds||[]).includes(authId));
   const [projectId,setProjectId]=useState(reportable[0]?.id||"");
   const [date,setDate]=useState(today());
-  const [to,setTo]=useState(REPORT_TO_DEFAULT);
-  const [cc,setCc]=useState(REPORT_CC_DEFAULT);
+  const [toExtra,setToExtra]=useState(""); // 받는사람 추가 1인 (고정 수신자 외)
   const [reasons,setReasons]=useState({});
   const [initReasons,setInitReasons]=useState({}); // 불러온 원본(변경 감지용)
   const proj=data.projects.find(p=>p.id===projectId)||null;
@@ -758,8 +760,7 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
     (data.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{ map[x.memberId]=x.reason; });
     setReasons(map); setInitReasons(map);
     const p=data.projects.find(x=>x.id===projectId);
-    setTo(p&&p.reportTo?p.reportTo:REPORT_TO_DEFAULT);
-    setCc(p&&p.reportCc?p.reportCc:REPORT_CC_DEFAULT);
+    setToExtra(p&&p.reportTo?p.reportTo:""); // 프로젝트별로 추가 받는사람 기억
   },[projectId,date]);
   const canEditRow=(mid)=> canMng || (proj&&proj.plId===authId) || mid===authId;
   const rows=(proj?.memberIds||[]).map(mid=>{
@@ -777,7 +778,7 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
       if(reason===(initReasons[r.memberId]||"").trim()) return; // 내가 바꾸지 않은 행은 건드리지 않음(남의 사유 보존)
       const idx=reps.findIndex(x=>x.projectId===projectId&&x.date===date&&x.memberId===r.memberId);
       if(idx>=0) reps[idx]={...reps[idx],reason}; else if(reason) reps.push({projectId,date,memberId:r.memberId,reason}); });
-    const projects=(latest.projects||[]).map(p=>p.id===projectId?{...p,reportTo:to,reportCc:cc}:p);
+    const projects=(latest.projects||[]).map(p=>p.id===projectId?{...p,reportTo:toExtra.trim()}:p);
     const next={...latest,otReports:reps,projects};
     persist(next);
     return next;
@@ -790,7 +791,7 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
     if((proj.memberIds||[]).length===0)return alert("이 프로젝트에 소속 팀원이 없어요. 팀원·프로젝트 관리에서 추가해 주세요.");
     const merged=await persistData();
     const map={}; (merged.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{map[x.memberId]=x.reason;});
-    const mail=buildReportMail({kind,project:proj,date,to,cc,reporter:meUser,rows:rows.map(r=>({name:r.name,reason:map[r.memberId]||reasons[r.memberId]||"",leave:r.leave}))});
+    const mail=buildReportMail({kind,project:proj,date,to:reportTo(toExtra),cc:REPORT_CC_FIXED,reporter:meUser,rows:rows.map(r=>({name:r.name,reason:map[r.memberId]||reasons[r.memberId]||"",leave:r.leave}))});
     openMail(mail); onClose();
   };
   const kindLabel=kind==="result"?"결과":"계획";
@@ -803,8 +804,9 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
         <div className="form">
           <Field label="프로젝트"><select className="input" value={projectId} onChange={e=>setProjectId(e.target.value)}>{reportable.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="일자"><input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)} /></Field>
-          <Field label="받는 사람"><input className="input" value={to} onChange={e=>setTo(e.target.value)} placeholder="받는 사람" /></Field>
-          <Field label="참조"><input className="input" value={cc} onChange={e=>setCc(e.target.value)} placeholder="참조" /></Field>
+          <Field label="받는 사람 (고정)"><input className="input" value={REPORT_TO_FIXED} readOnly disabled /></Field>
+          <Field label="받는 사람 추가 (1인, 선택)"><input className="input" value={toExtra} onChange={e=>setToExtra(e.target.value)} placeholder="추가 받는사람 이메일" autoComplete="off" /></Field>
+          <Field label="참조 (고정)" full><input className="input" value={REPORT_CC_FIXED} readOnly disabled /></Field>
         </div>
         <p className="panel-sub" style={{margin:"10px 0 0"}}>담당자별 연장근무 사유 {canMng?"(전체 편집 가능)":"(본인 행만 편집)"} · 제목: <strong>[보고] {proj?.name} 프로젝트 연장 근무 {kindLabel} 보고 ({String(date).replace(/-/g,"/")})</strong></p>
         <div className="tablewrap">
@@ -841,9 +843,7 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
   const [otId,setOtId]=useState("");
   const [dept,setDept]=useState(saved.dept!=null?saved.dept:(meUser.dept||""));
   const [title,setTitle]=useState(saved.title!=null?saved.title:(meUser.title||"연구원"));
-  const [teamTag,setTeamTag]=useState(saved.teamTag!=null?saved.teamTag:(meUser.dept||""));
-  const [to,setTo]=useState(saved.to||"");
-  const [cc,setCc]=useState(saved.cc||"");
+  const [toExtra,setToExtra]=useState(saved.toExtra||""); // 받는사람 추가 1인 (고정 외)
   // 기타: 내 추가근무(완료 블록) 중 선택 → "YYYY년 MM월 DD일 추가 근무 건에 대한 조퇴"
   const myOts=data.overtime.filter(o=>o.requesterId===authId&&o.status==="completed").sort((a,b)=>a.date<b.date?1:-1);
   const fmtEtc=(ds)=>{ const p=String(ds).split("-"); return p.length===3?(p[0]+"년 "+p[1]+"월 "+p[2]+"일 추가 근무 건에 대한 조퇴"):""; };
@@ -851,8 +851,8 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
     const [hh,mm]=String(time||"0:0").split(":").map(n=>parseInt(n,10)||0);
     const ot=myOts.find(o=>o.id===otId);
     const etc=ot?fmtEtc(ot.date):"";
-    try{ localStorage.setItem(LS,JSON.stringify({reason,dept,title,teamTag,to,cc})); }catch(e){}
-    openMail(buildAdjustMail({reporter:meUser,dept,title,teamTag,kind,reason,y:today.getFullYear(),mo:today.getMonth()+1,d:today.getDate(),hh,mm,etc,to,cc}));
+    try{ localStorage.setItem(LS,JSON.stringify({reason,dept,title,toExtra})); }catch(e){}
+    openMail(buildAdjustMail({reporter:meUser,dept,title,teamTag:REPORT_TEAM_TAG,kind,reason,y:today.getFullYear(),mo:today.getMonth()+1,d:today.getDate(),hh,mm,etc,to:reportTo(toExtra),cc:REPORT_CC_FIXED}));
   };
   return (
     <div className="backdrop" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
@@ -869,13 +869,14 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
             {myOts.map(o=><option key={o.id} value={o.id}>{o.date} · {fmtDur(o.totalMin)}{o.reason?(" · "+o.reason):""}</option>)}
           </select>
         </Field>
-        <Field label="제목 머리(팀)"><input className="input" value={teamTag} onChange={e=>setTeamTag(e.target.value)} placeholder="예: 자동화2팀" /></Field>
+        <Field label="제목 머리(팀)"><input className="input" value={REPORT_TEAM_TAG} readOnly disabled /></Field>
         <Field label="직급"><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="예: 연구원" /></Field>
         <Field label="소속(본문)" full><input className="input" value={dept} onChange={e=>setDept(e.target.value)} placeholder="예: 자동화 개발 파트" /></Field>
-        <Field label="받는 사람" full><input className="input" value={to} onChange={e=>setTo(e.target.value)} placeholder="예: '최부경/(협력사) 팀장/...'; '변혜원'" /></Field>
-        <Field label="참조" full><input className="input" value={cc} onChange={e=>setCc(e.target.value)} placeholder="예: Linkgenesis-autotest@lge.com" /></Field>
+        <Field label="받는 사람 (고정)"><input className="input" value={REPORT_TO_FIXED} readOnly disabled /></Field>
+        <Field label="받는 사람 추가 (1인, 선택)"><input className="input" value={toExtra} onChange={e=>setToExtra(e.target.value)} placeholder="추가 받는사람 이메일" /></Field>
+        <Field label="참조 (고정)" full><input className="input" value={REPORT_CC_FIXED} readOnly disabled /></Field>
       </div>
-      <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유·소속·직급·팀·받는사람·참조는 생성 시 이 기기에 저장돼 다음에 자동 입력됩니다.</p>
+      <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유·소속·직급·추가 받는사람은 생성 시 이 기기에 저장돼 다음에 자동 입력됩니다.</p>
       <div className="actions"><button className="btn primary" onClick={gen}>메일 초안 생성</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
     </div></div>
   );
