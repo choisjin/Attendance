@@ -815,44 +815,56 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
   const [toExtra,setToExtra]=useState(""); // 받는사람 추가 1인 (고정 수신자 외)
   const [reasons,setReasons]=useState({});
   const [initReasons,setInitReasons]=useState({}); // 불러온 원본(변경 감지용)
+  const [leaves,setLeaves]=useState({});           // 결과 보고 퇴근시간 (member→HH:MM)
+  const [initLeaves,setInitLeaves]=useState({});
   const proj=data.projects.find(p=>p.id===projectId)||null;
+  // 저장/불러온 데이터로 사유·퇴근시간 맵 구성 (퇴근시간 기본값 = 싱크된 추가근무 종료시각)
+  const buildMaps=(d)=>{
+    const p=(d.projects||[]).find(x=>x.id===projectId);
+    const saved={}; (d.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{ saved[x.memberId]=x; });
+    const rmap={}, lmap={};
+    (p?.memberIds||[]).forEach(mid=>{
+      const s=saved[mid];
+      rmap[mid]=s?(s.reason||""):"";
+      if(s&&s.leave) lmap[mid]=s.leave;
+      else { const blk=(d.overtime||[]).find(o=>o.requesterId===mid&&o.date===date&&o.status==="completed"); lmap[mid]=blk?(blk.end||""):""; }
+    });
+    return {rmap,lmap};
+  };
   useEffect(()=>{
-    const map={};
-    (data.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{ map[x.memberId]=x.reason; });
-    setReasons(map); setInitReasons(map);
+    const {rmap,lmap}=buildMaps(data);
+    setReasons(rmap); setInitReasons(rmap); setLeaves(lmap); setInitLeaves(lmap);
     const p=data.projects.find(x=>x.id===projectId);
-    setToExtra(p&&p.reportTo?p.reportTo:""); // 프로젝트별로 추가 받는사람 기억
+    setToExtra(p&&p.reportTo?p.reportTo:"");
   },[projectId,date]);
-  const canEditRow=(mid)=> canMng || (proj&&proj.plId===authId) || mid===authId;
-  const rows=(proj?.memberIds||[]).map(mid=>{
-    const m=member(mid);
-    const blk=data.overtime.find(o=>o.requesterId===mid&&o.date===date&&o.status==="completed");
-    return { memberId:mid, name:m?.name||"(삭제됨)", canEdit:canEditRow(mid), leave: blk?(blk.end||""):"" };
-  });
-  // 저장 직전 서버 최신본을 받아 '본인이 편집한 행'만 덮어써서 병합 → 동시 작성 충돌(덮어쓰기) 방지
+  const rows=(proj?.memberIds||[]).map(mid=>{ const m=member(mid); return { memberId:mid, name:m?.name||"(삭제됨)" }; });
+  // 저장 직전 서버 최신본을 받아 '내가 바꾼 행'만 덮어써서 병합 → 동시 작성 충돌(덮어쓰기) 방지
   const persistData=async()=>{
     let latest=data;
     try{ const r=await fetch(DATA_API,{cache:"no-store"}); const j=await r.json(); if(j&&j.ok&&j.data) latest=j.data; }catch(e){}
     let reps=[...(latest.otReports||[])];
-    rows.forEach(r=>{ if(!r.canEdit)return;
+    rows.forEach(r=>{
       const reason=(reasons[r.memberId]||"").trim();
-      if(reason===(initReasons[r.memberId]||"").trim()) return; // 내가 바꾸지 않은 행은 건드리지 않음(남의 사유 보존)
+      const leave=(leaves[r.memberId]||"").trim();
+      const changed = reason!==(initReasons[r.memberId]||"").trim() || leave!==(initLeaves[r.memberId]||"").trim();
+      if(!changed) return; // 안 바뀐 행은 건드리지 않음 (남의 입력 보존)
       const idx=reps.findIndex(x=>x.projectId===projectId&&x.date===date&&x.memberId===r.memberId);
-      if(idx>=0) reps[idx]={...reps[idx],reason}; else if(reason) reps.push({projectId,date,memberId:r.memberId,reason}); });
+      if(idx>=0) reps[idx]={...reps[idx],reason,leave}; else if(reason||leave) reps.push({projectId,date,memberId:r.memberId,reason,leave});
+    });
     const projects=(latest.projects||[]).map(p=>p.id===projectId?{...p,reportTo:toExtra.trim()}:p);
     const next={...latest,otReports:reps,projects};
     persist(next);
     return next;
   };
   const onSave=async()=>{ if(!proj)return; const merged=await persistData();
-    const map={}; (merged.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{map[x.memberId]=x.reason;}); setReasons(map); setInitReasons(map);
-    flash("보고 사유를 저장했어요."); };
+    const {rmap,lmap}=buildMaps(merged); setReasons(rmap); setInitReasons(rmap); setLeaves(lmap); setInitLeaves(lmap);
+    flash("보고 내용을 저장했어요."); };
   const onGen=async()=>{
     if(!proj)return alert("프로젝트를 선택해 주세요.");
     if((proj.memberIds||[]).length===0)return alert("이 프로젝트에 소속 팀원이 없어요. 팀원·프로젝트 관리에서 추가해 주세요.");
     const merged=await persistData();
-    const map={}; (merged.otReports||[]).filter(x=>x.projectId===projectId&&x.date===date).forEach(x=>{map[x.memberId]=x.reason;});
-    const mail=buildReportMail({kind,project:proj,date,to:reportTo(toExtra),cc:REPORT_CC_FIXED,reporter:meUser,rows:rows.map(r=>({name:r.name,reason:map[r.memberId]||reasons[r.memberId]||"",leave:r.leave}))});
+    const {rmap,lmap}=buildMaps(merged);
+    const mail=buildReportMail({kind,project:proj,date,to:reportTo(toExtra),cc:REPORT_CC_FIXED,reporter:meUser,rows:rows.map(r=>({name:r.name,reason:rmap[r.memberId]||reasons[r.memberId]||"",leave:lmap[r.memberId]||leaves[r.memberId]||""}))});
     openMail(mail); onClose();
   };
   const kindLabel=kind==="result"?"결과":"계획";
@@ -869,22 +881,22 @@ function ReportModal({kind,data,authId,meUser,member,persist,flash,openMail,onCl
           <Field label="받는 사람 추가 (1인, 선택)"><input className="input" value={toExtra} onChange={e=>setToExtra(e.target.value)} placeholder="추가 받는사람 이메일" autoComplete="off" /></Field>
           <Field label="참조 (고정)" full><input className="input" value={REPORT_CC_FIXED} readOnly disabled /></Field>
         </div>
-        <p className="panel-sub" style={{margin:"10px 0 0"}}>담당자별 연장근무 사유 {canMng?"(전체 편집 가능)":"(본인 행만 편집)"} · 제목: <strong>[보고] {proj?.name} 프로젝트 연장 근무 {kindLabel} 보고 ({String(date).replace(/-/g,"/")})</strong></p>
+        <p className="panel-sub" style={{margin:"10px 0 0"}}>담당자별 연장근무 사유 (전체 편집 가능) · 제목: <strong>[보고] {proj?.name} 프로젝트 연장 근무 {kindLabel} 보고 ({String(date).replace(/-/g,"/")})</strong></p>
         <div className="tablewrap">
           <table className="reptable">
-            <thead><tr><th>담당자</th><th>연장근무 사유</th>{kind==="result"&&<th style={{width:80}}>퇴근 시간</th>}</tr></thead>
+            <thead><tr><th>담당자</th><th>연장근무 사유</th>{kind==="result"&&<th style={{width:110}}>퇴근 시간</th>}</tr></thead>
             <tbody>
               {rows.length===0?<tr><td className="c" colSpan={kind==="result"?3:2}><span className="dim">소속 팀원이 없어요.</span></td></tr>:rows.map(r=>(
                 <tr key={r.memberId}>
                   <td className="c" style={{whiteSpace:"nowrap"}}>{r.name}{r.memberId===authId?<span className="dim"> (나)</span>:null}</td>
-                  <td>{r.canEdit?<textarea value={reasons[r.memberId]||""} onChange={e=>setReasons({...reasons,[r.memberId]:e.target.value})} placeholder="연장근무 사유 (줄바꿈 가능)" />:<span style={{whiteSpace:"pre-wrap"}} className="dim">{reasons[r.memberId]||"—"}</span>}</td>
-                  {kind==="result"&&<td className="c">{r.leave||"—"}</td>}
+                  <td><textarea value={reasons[r.memberId]||""} onChange={e=>setReasons({...reasons,[r.memberId]:e.target.value})} placeholder="연장근무 사유 (줄바꿈 가능)" /></td>
+                  {kind==="result"&&<td className="c"><input className="input" type="time" style={{width:"100%",padding:"6px 8px"}} value={leaves[r.memberId]||""} onChange={e=>setLeaves({...leaves,[r.memberId]:e.target.value})} /></td>}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유는 각자 본인 행을 저장하면 공유 취합됩니다. {kind==="result"&&"퇴근 시간은 싱크된 추가근무에서 자동 표시됩니다."}</p>
+        <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 다른 인원의 사유도 직접 입력·저장할 수 있고, 저장하면 공유 취합됩니다. {kind==="result"&&"퇴근 시간은 싱크된 추가근무 값이 기본이며 전 인원 직접 수정 가능합니다."}</p>
         <div className="actions"><button className="btn primary" onClick={onGen}>메일 초안 생성</button><button className="btn ghost" onClick={onSave}>사유 저장</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
         </React.Fragment>
         )}
