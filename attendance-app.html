@@ -295,11 +295,11 @@ function buildReportMail({kind,project,date,to,cc,reporter,rows}){
 }
 
 // 근무조정(퇴근/출근) 보고 메일(HTML+텍스트) 생성 — 이미지 양식
-function buildAdjustMail({reporter,dept,title,teamTag,kind,reason,y,mo,d,hh,mm,etc,to,cc}){
+function buildAdjustMail({reporter,title,teamTag,kind,reason,y,mo,d,hh,mm,etc,to,cc}){
   const pad=(n)=>String(n).padStart(2,"0");
   const yy=String(y).slice(2);
   const subject="["+teamTag+"] "+reporter.name+" "+kind+" 근무조정 보고 ("+yy+"."+pad(mo)+"."+pad(d)+")";
-  const reporterLine="㈜링크제니시스 "+(dept?dept+" ":"")+reporter.name+(title?(" "+title):"")+" 입니다.";
+  const reporterLine="링크제니시스 "+reporter.name+(title?(" "+title):"")+" 입니다.";
   const dtLine=y+"년 "+pad(mo)+"월 "+pad(d)+"일 "+pad(hh)+"시 "+pad(mm)+"분";
   const items=[["조정 인원",reporter.name],["조정 사유",reason||""],["조정 일시",dtLine],["기타",etc||""]];
   const liHtml=items.map(([k,v])=>"-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+escHtml(k)+" : "+escHtml(v)).join("<br>");
@@ -841,7 +841,6 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
   const [reason,setReason]=useState(saved.reason||"개인 정비");
   const [time,setTime]=useState(pad(today.getHours())+":"+pad(today.getMinutes()));
   const [otId,setOtId]=useState("");
-  const [dept,setDept]=useState(saved.dept!=null?saved.dept:(meUser.dept||""));
   const [title,setTitle]=useState(saved.title!=null?saved.title:(meUser.title||"연구원"));
   const [toExtra,setToExtra]=useState(saved.toExtra||""); // 받는사람 추가 1인 (고정 외)
   // 기타: 내 추가근무(완료 블록) 중 선택 → "YYYY년 MM월 DD일 추가 근무 건에 대한 조퇴"
@@ -851,8 +850,8 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
     const [hh,mm]=String(time||"0:0").split(":").map(n=>parseInt(n,10)||0);
     const ot=myOts.find(o=>o.id===otId);
     const etc=ot?fmtEtc(ot.date):"";
-    try{ localStorage.setItem(LS,JSON.stringify({reason,dept,title,toExtra})); }catch(e){}
-    openMail(buildAdjustMail({reporter:meUser,dept,title,teamTag:REPORT_TEAM_TAG,kind,reason,y:today.getFullYear(),mo:today.getMonth()+1,d:today.getDate(),hh,mm,etc,to:reportTo(toExtra),cc:REPORT_CC_FIXED}));
+    try{ localStorage.setItem(LS,JSON.stringify({reason,title,toExtra})); }catch(e){}
+    openMail(buildAdjustMail({reporter:meUser,title,teamTag:REPORT_TEAM_TAG,kind,reason,y:today.getFullYear(),mo:today.getMonth()+1,d:today.getDate(),hh,mm,etc,to:reportTo(toExtra),cc:REPORT_CC_FIXED}));
   };
   return (
     <div className="backdrop" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
@@ -871,12 +870,11 @@ function AdjustModal({data,authId,meUser,openMail,onClose}){
         </Field>
         <Field label="제목 머리(팀)"><input className="input" value={REPORT_TEAM_TAG} readOnly disabled /></Field>
         <Field label="직급"><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="예: 연구원" /></Field>
-        <Field label="소속(본문)" full><input className="input" value={dept} onChange={e=>setDept(e.target.value)} placeholder="예: 자동화 개발 파트" /></Field>
         <Field label="받는 사람 (고정)"><input className="input" value={REPORT_TO_FIXED} readOnly disabled /></Field>
         <Field label="받는 사람 추가 (1인, 선택)"><input className="input" value={toExtra} onChange={e=>setToExtra(e.target.value)} placeholder="추가 받는사람 이메일" /></Field>
         <Field label="참조 (고정)" full><input className="input" value={REPORT_CC_FIXED} readOnly disabled /></Field>
       </div>
-      <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유·소속·직급·추가 받는사람은 생성 시 이 기기에 저장돼 다음에 자동 입력됩니다.</p>
+      <p className="dim" style={{margin:"8px 0 0",fontSize:"12px"}}>※ 사유·직급·추가 받는사람은 생성 시 이 기기에 저장돼 다음에 자동 입력됩니다.</p>
       <div className="actions"><button className="btn primary" onClick={gen}>메일 초안 생성</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
     </div></div>
   );
@@ -1248,19 +1246,39 @@ function Field({label,children,full}){ return <label className={"field"+(full?" 
 function Chip({status}){ const s=STATUS[status]||{label:status,cls:""}; return <span className={"chip "+s.cls}>{s.label}</span>; }
 function Empty({children}){ return <div className="empty">{children}</div>; }
 function MailModal({modal,onClose,flash}){
+  const prevRef=React.useRef(null);
   const copy=async()=>{
+    const html=modal.html, text=modal.text||"";
+    // 1) 보안 컨텍스트(HTTPS/localhost)에서는 최신 클립보드 API
+    if(navigator.clipboard && window.isSecureContext){
+      try{
+        if(html && window.ClipboardItem){
+          await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]);
+        } else { await navigator.clipboard.writeText(text); }
+        flash(html?"본문을 복사했어요 (서식 포함).":"복사했어요."); return;
+      }catch(e){}
+    }
+    // 2) 폴백: 화면 요소 선택 후 execCommand — 일반 HTTP(LAN IP) 접속에서도 동작
     try{
-      if(modal.html&&window.ClipboardItem){
-        const item=new ClipboardItem({"text/html":new Blob([modal.html],{type:"text/html"}),"text/plain":new Blob([modal.text||""],{type:"text/plain"})});
-        await navigator.clipboard.write([item]); flash("본문을 복사했어요 (서식 포함)."); return;
+      let ok=false;
+      if(html && prevRef.current){
+        const range=document.createRange(); range.selectNodeContents(prevRef.current);
+        const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        ok=document.execCommand("copy"); sel.removeAllRanges();
+      }else{
+        const ta=document.createElement("textarea"); ta.value=text;
+        ta.style.position="fixed"; ta.style.left="-9999px"; ta.style.top="0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        ok=document.execCommand("copy"); document.body.removeChild(ta);
       }
-      await navigator.clipboard.writeText(modal.text||""); flash("복사했어요.");
-    }catch(e){ try{ await navigator.clipboard.writeText(modal.text||""); flash("복사했어요."); }catch(e2){ flash("직접 선택해 복사해 주세요."); } }
+      if(ok){ flash(html?"본문을 복사했어요 (서식 포함).":"복사했어요."); return; }
+    }catch(e){}
+    flash("복사 실패 — 아래 본문을 직접 드래그해 복사해 주세요.");
   };
   return (<div className="backdrop" onClick={onClose}><div className={"modal"+(modal.html?" wide":"")} onClick={e=>e.stopPropagation()}>
     <div className="modal-head"><h3>{modal.title}</h3><button className="x" onClick={onClose}>✕</button></div>
     {(modal.to||modal.cc)&&<p className="dim mb" style={{userSelect:"text"}}>받는 사람: <strong>{modal.to}</strong>{modal.cc?<span> · 참조: <strong>{modal.cc}</strong></span>:null}</p>}
-    {modal.html?<div className="mailprev" dangerouslySetInnerHTML={{__html:modal.html}} />:<textarea className="mail" readOnly value={modal.text} />}
+    {modal.html?<div className="mailprev" ref={prevRef} dangerouslySetInnerHTML={{__html:modal.html}} />:<textarea className="mail" readOnly value={modal.text} />}
     <div className="actions"><button className="btn primary" onClick={copy}>{modal.html?"본문 복사 (서식 포함)":"복사"}</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
   </div></div>);
 }
