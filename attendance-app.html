@@ -1247,9 +1247,24 @@ function Chip({status}){ const s=STATUS[status]||{label:status,cls:""}; return <
 function Empty({children}){ return <div className="empty">{children}</div>; }
 function MailModal({modal,onClose,flash}){
   const prevRef=React.useRef(null);
-  const copy=async()=>{
+  // 일반 텍스트 복사 (제목/받는사람/참조) — 비보안(HTTP LAN)에서도 execCommand 폴백
+  const copyText=async(text,label)=>{
+    text=text==null?"":String(text);
+    if(navigator.clipboard && window.isSecureContext){
+      try{ await navigator.clipboard.writeText(text); flash(label+" 복사했어요."); return; }catch(e){}
+    }
+    try{
+      const ta=document.createElement("textarea"); ta.value=text;
+      ta.style.position="fixed"; ta.style.left="-9999px"; ta.style.top="0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand("copy"); document.body.removeChild(ta);
+      if(ok){ flash(label+" 복사했어요."); return; }
+    }catch(e){}
+    flash("복사 실패 — 값을 직접 선택해 복사해 주세요.");
+  };
+  // 본문 복사 (서식 포함)
+  const copyBody=async()=>{
     const html=modal.html, text=modal.text||"";
-    // 1) 보안 컨텍스트(HTTPS/localhost)에서는 최신 클립보드 API
     if(navigator.clipboard && window.isSecureContext){
       try{
         if(html && window.ClipboardItem){
@@ -1258,7 +1273,6 @@ function MailModal({modal,onClose,flash}){
         flash(html?"본문을 복사했어요 (서식 포함).":"복사했어요."); return;
       }catch(e){}
     }
-    // 2) 폴백: 화면 요소 선택 후 execCommand — 일반 HTTP(LAN IP) 접속에서도 동작
     try{
       let ok=false;
       if(html && prevRef.current){
@@ -1275,11 +1289,22 @@ function MailModal({modal,onClose,flash}){
     }catch(e){}
     flash("복사 실패 — 아래 본문을 직접 드래그해 복사해 주세요.");
   };
+  const metaRow=(lbl,val,tag)=> val?(
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span className="flabel" style={{flex:"0 0 60px"}}>{lbl}</span>
+      <span className="dim" style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"var(--ink)",userSelect:"text"}} title={val}>{val}</span>
+      <button className="btn small ghost" style={{flexShrink:0,padding:"5px 12px"}} onClick={()=>copyText(val,tag)}>복사</button>
+    </div>
+  ):null;
   return (<div className="backdrop" onClick={onClose}><div className={"modal"+(modal.html?" wide":"")} onClick={e=>e.stopPropagation()}>
-    <div className="modal-head"><h3>{modal.title}</h3><button className="x" onClick={onClose}>✕</button></div>
-    {(modal.to||modal.cc)&&<p className="dim mb" style={{userSelect:"text"}}>받는 사람: <strong>{modal.to}</strong>{modal.cc?<span> · 참조: <strong>{modal.cc}</strong></span>:null}</p>}
+    <div className="modal-head"><h3>메일 초안</h3><button className="x" onClick={onClose}>✕</button></div>
+    <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+      {metaRow("제목",modal.title,"제목을")}
+      {metaRow("받는 사람",modal.to,"받는사람을")}
+      {metaRow("참조",modal.cc,"참조를")}
+    </div>
     {modal.html?<div className="mailprev" ref={prevRef} dangerouslySetInnerHTML={{__html:modal.html}} />:<textarea className="mail" readOnly value={modal.text} />}
-    <div className="actions"><button className="btn primary" onClick={copy}>{modal.html?"본문 복사 (서식 포함)":"복사"}</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
+    <div className="actions"><button className="btn primary" onClick={copyBody}>{modal.html?"본문 복사 (서식 포함)":"본문 복사"}</button><button className="btn ghost" onClick={onClose}>닫기</button></div>
   </div></div>);
 }
 function mailRequest(f,member,proj){ const pl=member(f.plId)?.name||"PL",lg=member(f.lgId)?.name||"스탭",pn=proj(f.projectId)?.name||"(프로젝트)";
